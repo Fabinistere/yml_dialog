@@ -19,6 +19,15 @@ this is not a trivial question.
 - bevy_dialog_system
 - bevy_fto_dialog / bevy_fob_dialog
 
+## RoadMap
+
+- [ ] fully functional API to implement a dialog system into a bevy game
+  - [ ] Follow all guidelines from [Bevy plugins guidelines](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md)
+  - [ ] create documentation
+    - [ ] create an example
+    - [ ] list all `SystemSet` available from this plugin
+    - [ ] list all `Component` available from this plugin
+
 ## Example
 
 ```rust

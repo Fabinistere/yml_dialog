@@ -1,0 +1,10 @@
+[package]
+name = "fto-dialog"
+version = "0.1.0"
+authors = ["Olf EPAIN <wabtey@disroot.org>", "Morgan Van Amerongen <vanamerongen.morgan@gmail.com>"]
+repository = "https://github.com/Fabinistere/fto-dialog"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+
+[dependencies]
+bevy = { version = "0.10", git = "https://github.com/bevyengine/bevy", rev="9788b386c7846c99978ab5c1a33698ec5a471d84", default-features = false }
