@@ -7,4 +7,21 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.10", git = "https://github.com/bevyengine/bevy", rev="9788b386c7846c99978ab5c1a33698ec5a471d84", default-features = false }
+bevy = "0.10" #  version = "0.10", git = "https://github.com/bevyengine/bevy", rev="9788b386c7846c99978ab5c1a33698ec5a471d84", default-features = false
+bevy_tweening = "0.7" # 0.8
+
+# image = "0.23"
+
+# rand = "0.8.5"
+
+# ----------- Debug -----------
+bevy-inspector-egui = "0.18"
+log = "0.4.17"
+
+# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
+
+# Enable only a small amount of optimization in debug mode
+[profile.dev]
+opt-level = 1
