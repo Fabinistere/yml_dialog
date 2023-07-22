@@ -113,7 +113,7 @@ pub fn update_upper_scroll(
 
     mut reset_event: EventWriter<ResetDialogBoxEvent>,
 ) {
-    for _ev in scroll_event.iter() {
+    for UpdateScrollEvent in scroll_event.iter() {
         info!("- Upper - Scroll Event !");
 
         match upper_scroll_query.get_single() {
@@ -151,20 +151,17 @@ pub fn update_player_scroll(
 
     mut reset_event: EventWriter<ResetDialogBoxEvent>,
 ) {
-    for _ev in scroll_event.iter() {
+    for UpdateScrollEvent in scroll_event.iter() {
         info!("- Player - Scroll Event !");
 
         match player_scroll_query.get_single() {
             Err(e) => warn!("{}", e),
             Ok((player_scroll, scroll_children, _player_scroll_entity)) => {
-                let mut place = 0;
-
                 // REFACTOR: every 3 choices create a page and start again from the 1st child
-                for choice in &player_scroll.choices {
+                for (place, choice) in player_scroll.choices.iter().enumerate() {
                     // FIXME: CRASH HERE OutOfBound if place > 3 (view the refactor above)
                     if place > 3 {
                         continue;
-                        // place = place + 1;
                     }
 
                     // The button's visibility is based on the size
@@ -173,10 +170,8 @@ pub fn update_player_scroll(
                         dialog_box: scroll_children[place],
                         text: choice.to_owned(),
                     });
-
-                    place = place + 1;
                 }
-                info!("DEBUG: player scroll gain {} choice-s", place);
+                // info!("DEBUG: player scroll gain {} choice-s", place);
             }
         }
         // if no choice

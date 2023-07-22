@@ -43,6 +43,7 @@ impl DialogBox {
 ///   - ui::dialog_panel::update_player_scroll
 ///     - updates PlayerScroll Text with the UpperScroll infos
 ///     happens for every choice there is in the PlayerScroll
+///
 /// Read in
 ///   - ui::dialog_panel::reset_dialog_box
 ///     - creates a DialogBox to transfer info to the child Text
@@ -102,31 +103,30 @@ pub fn reset_dialog_box(
     mut reset_event: EventReader<ResetDialogBoxEvent>,
 
     mut dialog_box_query: Query<
-        (&mut DialogBox, &Children, Entity),
+        (Entity, &mut DialogBox, &Children),
         Or<(With<PlayerChoice>, With<UpperScroll>)>,
     >,
     mut text_query: Query<&mut Text>,
 ) {
-    for event in reset_event.iter() {
-        match dialog_box_query.get_mut(event.dialog_box) {
+    for ResetDialogBoxEvent { dialog_box, text } in reset_event.iter() {
+        match dialog_box_query.get_mut(*dialog_box) {
             Err(_e) => {
                 info!("DEBUG: no DialogBox in the UpperScroll");
-                commands.entity(event.dialog_box).insert(DialogBox::new(
-                    event.text.clone(),
-                    DIALOG_BOX_UPDATE_DELTA_S,
-                ));
+                commands
+                    .entity(*dialog_box)
+                    .insert(DialogBox::new(text.to_string(), DIALOG_BOX_UPDATE_DELTA_S));
             }
-            Ok((mut dialog_box, children, _)) => {
+            Ok((_, mut dialog_box, children)) => {
                 // FIXME: bug - Reset the text even if there is no change
                 // Clear the DialogBox Child: the Text
                 match text_query.get_mut(children[0]) {
                     Err(e) => warn!("No Text Section: {:?}", e),
-                    Ok(mut text) => {
-                        if dialog_box.text != event.text.clone() {
-                            text.sections[0].value.clear();
+                    Ok(mut dialog_text) => {
+                        if dialog_box.text != *text {
+                            dialog_text.sections[0].value.clear();
                             // replace current DialogBox with a brand new one
                             *dialog_box =
-                                DialogBox::new(event.text.clone(), DIALOG_BOX_UPDATE_DELTA_S);
+                                DialogBox::new(text.to_string(), DIALOG_BOX_UPDATE_DELTA_S);
                         }
                     }
                 }

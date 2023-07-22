@@ -160,6 +160,7 @@ pub fn create_dialog_panel_on_key_press(
     // mut key_evr: EventReader<KeyboardInput>,
     player_query: Query<(Entity, &Dialog), With<Player>>,
 ) {
+    // REFACTOR: check [ScanCode](https://bevy-cheatbook.github.io/input/keyboard.html#key-codes-and-scan-codes) instead
     if keyboard_input.just_pressed(KeyCode::O) {
         if let Ok((_entity, animator, _style)) = query.get_single() {
             if animator.tweenable().progress() >= 1.0 {
@@ -169,11 +170,10 @@ pub fn create_dialog_panel_on_key_press(
             // keep track of player's personal thoughts
             let (player, dialog) = player_query.single();
 
-            let dialog_tree: String;
-            match &dialog.current_node {
-                Some(text) => dialog_tree = text.to_owned(),
-                None => dialog_tree = String::new(),
-            }
+            let dialog_tree: String = match &dialog.current_node {
+                Some(text) => text.to_owned(),
+                None => String::new(),
+            };
 
             create_dialog_panel_event.send(CreateDialogPanelEvent {
                 interlocutor: player,
@@ -383,7 +383,7 @@ pub fn create_dialog_panel(
                 parent.spawn((
                     ImageBundle {
                         image: dialog_panel_resources.chandelier.clone().into(),
-                        style: child_sprite_style.clone(),
+                        style: child_sprite_style,
                         ..ImageBundle::default()
                     },
                     Name::new("Light"),
@@ -470,7 +470,7 @@ pub fn create_dialog_panel(
                 parent
                     .spawn((
                         ImageBundle {
-                            image: player_scroll_img.clone().into(),
+                            image: player_scroll_img.into(),
                             style: Style {
                                 position_type: PositionType::Absolute,
                                 size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
@@ -859,7 +859,7 @@ pub fn end_node_dialog(
 
     mut close_dialog_panel_events: EventWriter<CloseDialogPanelEvent>,
 ) {
-    for _ in end_node_dialog_event.iter() {
+    for EndNodeDialogEvent in end_node_dialog_event.iter() {
         info!("DEBUG: EndNodeEvent...");
 
         let (_ui_wall, panel) = panel_query.single();

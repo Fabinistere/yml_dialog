@@ -137,7 +137,7 @@ pub fn dialog_dive(
     mut drop_first_text_upper_scroll_event: EventWriter<DropFirstTextUpperScroll>,
     // mut trigger_event: EventWriter<TriggerEvent>,
 ) {
-    for event in dialog_dive_event.iter() {
+    for DialogDiveEvent { child_index, skip } in dialog_dive_event.iter() {
         info!("DEBUG: DialogDive Event");
         let mut panel = panel_query.single_mut();
         // let interlocutor = panel.main_interlocutor;
@@ -167,7 +167,7 @@ pub fn dialog_dive(
 
             if upper_scroll.texts.len() > 1 {
                 drop_first_text_upper_scroll_event.send(DropFirstTextUpperScroll);
-            } else if !(dialog_tree.borrow().is_choice() && event.skip) {
+            } else if !(dialog_tree.borrow().is_choice() && *skip) {
                 // shouldn't exist : end choice (which hasn't child)
                 // so, we don't test it here
 
@@ -187,7 +187,7 @@ pub fn dialog_dive(
                     // **the rule implied not**
                     // cause a text must have one child or none
 
-                    let child = dialog_tree.borrow().children[event.child_index]
+                    let child = dialog_tree.borrow().children[*child_index]
                         .borrow()
                         .print_file();
 
@@ -269,7 +269,7 @@ pub fn drop_first_text_upper_scroll(
     // update the DialogBox according to the Scroll
     mut scroll_event: EventWriter<UpdateScrollEvent>,
 ) {
-    for _event in drop_event.iter() {
+    for DropFirstTextUpperScroll in drop_event.iter() {
         // TOTEST: calling this event mean the scroll do exist but maybe not ?
         let (mut upper_scroll, _upper_scroll_entity) = upper_scroll_query.single_mut();
 
