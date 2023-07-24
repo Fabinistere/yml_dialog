@@ -30,10 +30,16 @@ this is not a trivial question.
 
 ## Example
 
+Clone the repertory and run `cargo run --example fto_dialog_wall`
+
+<!-- TODO: wams the `fto_dialog_wall` example -->
+
+<!-- 
 ```rust
 #[derive(Component)]
 struct DialogNode
 ```
+-->
 
 ## Contribute
 
@@ -41,6 +47,9 @@ Release's format is based on [Keep a Changelog](https://keepachangelog.com/en/1.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 This project also follows to [A successful Git branching model](https://nvie.com/posts/a-successful-git-branching-model/).
+
+We have to respect all the [rust API convention](https://rust-lang.github.io/api-guidelines/checklist.html).
+Run `cargo clippy` as frequently as possible.
 
 ## License
 
