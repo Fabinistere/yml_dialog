@@ -1,12 +1,11 @@
 use bevy::{prelude::*, render::texture::ImagePlugin, window::WindowResolution};
 use bevy_tweening::TweeningPlugin;
-use ui::dialog_system::Dialog;
 
-use crate::ui::UiPlugin;
-use constants::{character::dialog::OLF_DIALOG, CLEAR, FIXED_TIME_STEP, HEIGHT, RESOLUTION};
-
-pub mod constants;
-pub mod ui;
+use fto_dialog::{
+    constants::{character::dialog::OLF_DIALOG, CLEAR, FIXED_TIME_STEP, HEIGHT, RESOLUTION},
+    ui::{dialog_system::Dialog, UiPlugin},
+    Player,
+};
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 pub enum GameState {
@@ -58,12 +57,3 @@ fn spawn_camera(mut commands: Commands) {
 fn spawn_player(mut commands: Commands) {
     commands.spawn((Player, Dialog::new(OLF_DIALOG), Name::new("Temp player")));
 }
-
-#[derive(Component)]
-pub struct Karma(pub i32);
-
-#[derive(Component)]
-pub struct NPC;
-
-#[derive(Component)]
-pub struct Player;
