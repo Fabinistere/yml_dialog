@@ -18,9 +18,8 @@ use std::{cell::RefCell, fmt, rc::Rc, str::FromStr};
 
 use bevy::prelude::{info, warn, Component};
 
-use crate::constants::character::{KARMA_MAX, KARMA_MIN};
-
-// mod tests;
+const KARMA_MAX: i32 = 100;
+const KARMA_MIN: i32 = -KARMA_MAX;
 
 /// Points to the current DialogNode the npc is in.
 ///
@@ -63,6 +62,7 @@ pub struct Dialog {
 }
 
 impl Dialog {
+    /// TODO: feature - Read at dialog_file instead of CST
     pub fn new(str: &str) -> Dialog {
         Dialog {
             current_node: Some(str.to_string()),

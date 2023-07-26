@@ -1,11 +1,8 @@
 use bevy::{prelude::*,winit::WinitSettings, render::texture::ImagePlugin, window::WindowResolution};
 use bevy_tweening::TweeningPlugin;
 
-use fto_dialog::{
-    constants::{character::dialog::OLF_DIALOG, CLEAR, FIXED_TIME_STEP, HEIGHT, RESOLUTION},
-    ui::{dialog_system::Dialog},
-    Player,
-};
+use constants::{FIXED_TIME_STEP, CLEAR, HEIGHT, RESOLUTION, character::dialog::FABIEN_DIALOG};
+use fto_dialog::ui::dialog_system::Dialog;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 pub enum GameState {
@@ -13,6 +10,15 @@ pub enum GameState {
     Playing,
     Discussion,
 }
+
+#[derive(Component)]
+pub struct Karma(pub i32);
+
+#[derive(Component)]
+pub struct Player;
+
+#[derive(Component)]
+pub struct NPC;
 
 fn main() {
     // // When building for WASM, print panics to the browser console
@@ -54,7 +60,7 @@ fn spawn_camera(mut commands: Commands) {
 }
 
 fn spawn_player(mut commands: Commands) {
-    commands.spawn((Player, Dialog::new(OLF_DIALOG), Name::new("Temp player")));
+    commands.spawn((Player, Karma(50), Dialog::new(FABIEN_DIALOG), Name::new("Player")));
 }
 
 
@@ -122,9 +128,7 @@ mod dialog_box {
 
     use bevy::prelude::*;
 
-    use fto_dialog::constants::ui::dialogs::DIALOG_BOX_UPDATE_DELTA_S;
-
-    use crate::dialog_scroll::{PlayerChoice, UpperScroll};
+    use crate::{dialog_scroll::{PlayerChoice, UpperScroll}, constants::ui::dialogs::DIALOG_BOX_UPDATE_DELTA_S};
 
     /// Represents the entity containing the displayed text as first children.
     ///
@@ -272,16 +276,16 @@ mod dialog_panel {
     use bevy_tweening::{lens::UiPositionLens, *};
     use std::time::Duration;
 
-    use fto_dialog::{
-        constants::ui::dialogs::*,
-        ui::{
-            dialog_system::{init_tree_file, Dialog, DialogType},
+    use fto_dialog::ui::dialog_system::{init_tree_file, Dialog, DialogType};
+
+    use crate::{
+        dialog_scroll::{
+            PlayerChoice, PlayerScroll, Scroll, ScrollTimer, UpdateScrollEvent, UpperScroll,
+        },
+        constants::ui::dialogs::{
+            DIALOG_PANEL_ANIMATION_TIME_MS, DIALOG_PANEL_ANIMATION_OFFSET, SCROLL_ANIMATION_DELTA_S, NORMAL_BUTTON, SCROLL_ANIMATION_FRAMES_NUMBER
         },
         Karma, Player, NPC,
-    };
-
-    use crate::dialog_scroll::{
-        PlayerChoice, PlayerScroll, Scroll, ScrollTimer, UpdateScrollEvent, UpperScroll,
     };
 
     /// Represents The UI Wall.
@@ -296,7 +300,6 @@ mod dialog_panel {
     /// TODO: feature - sync author with interlocutor (to know which one is talking)
     /// REFACTOR: Turn DialogPanel into a Resource
     ///
-    /// REFACTOR: CUSTOM
     #[derive(Component, Reflect)]
     pub struct DialogPanel {
         // keep track of the origanal interlocutor
@@ -306,8 +309,6 @@ mod dialog_panel {
         pub dialog_tree: String,
     }
 
-    /// REFACTOR: CUSTOM
-    ///
     /// Happens when
     ///   - ui::dialog_panel::create_dialog_panel_on_key_press
     ///     - press 'o' to open the UI
@@ -322,8 +323,6 @@ mod dialog_panel {
         dialog_tree: String,
     }
 
-    /// REFACTOR: CUSTOM
-    ///
     /// Happens when
     ///   - ui::dialog_panel::update_dialog_panel
     ///     - the dialog tree contained within the DialogPanel is empty
@@ -334,8 +333,6 @@ mod dialog_panel {
     ///     and exit the Combat ( send CombatExitEvent )
     pub struct EndNodeDialogEvent;
 
-    /// REFACTOR: CUSTOM
-    ///
     /// Happens when
     ///   - ui::dialog_panel::create_dialog_panel_on_key_press
     ///     - ui already open
@@ -349,7 +346,6 @@ mod dialog_panel {
     ///     - close ui
     pub struct CloseDialogPanelEvent;
 
-    /// REFACTOR: CUSTOM
     #[derive(Resource)]
     pub struct DialogPanelResources {
         text_font: Handle<Font>,
@@ -361,7 +357,6 @@ mod dialog_panel {
         pub scroll_animation: Vec<Handle<Image>>,
     }
 
-    /// REFACTOR: CUSTOM
     pub fn load_textures(
         mut commands: Commands,
         asset_server: Res<AssetServer>,
@@ -409,7 +404,6 @@ mod dialog_panel {
     ///
     /// # Note
     ///
-    /// REFACTOR: CUSTOM
     ///
     /// FIXME: PB Spamming the ui key 'o'; ?throws an error
     pub fn create_dialog_panel_on_key_press(
@@ -469,7 +463,6 @@ mod dialog_panel {
         // }
     }
 
-    /// REFACTOR: CUSTOM
     pub fn close_dialog_panel(
         mut commands: Commands,
         mut close_dialog_panel_events: EventReader<CloseDialogPanelEvent>,
@@ -501,7 +494,6 @@ mod dialog_panel {
         }
     }
 
-    /// REFACTOR: CUSTOM
     pub fn despawn_dialog_panel(
         mut commands: Commands,
         mut completed_event: EventReader<TweenCompleted>,
@@ -513,7 +505,6 @@ mod dialog_panel {
         }
     }
 
-    /// REFACTOR: CUSTOM
     pub fn create_dialog_panel(
         mut create_dialog_panel_events: EventReader<CreateDialogPanelEvent>,
         mut create_scroll_content: EventWriter<UpdateScrollEvent>,
@@ -593,9 +584,9 @@ mod dialog_panel {
                             },
                             size: Size::new(Val::Auto, Val::Percent(100.0)),
                             aspect_ratio: Some(284.0 / 400.0),
-                            ..Style::default()
+                            ..default()
                         },
-                        ..ImageBundle::default()
+                        ..default()
                     },
                     // REFACTOR: Turn DialogPanel into a Resource
                     DialogPanel {
@@ -608,8 +599,8 @@ mod dialog_panel {
                 .with_children(|parent| {
                     let child_sprite_style = Style {
                         position_type: PositionType::Absolute,
-                        size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
-                        ..Style::default()
+                        size: Size::new(Val::Percent(100.), Val::Percent(100.)),
+                        ..default()
                     };
 
                     // panels under the wall to prevent them from sticking out of the window after being lifted.
@@ -617,7 +608,7 @@ mod dialog_panel {
                         ImageBundle {
                             image: dialog_panel_resources.stained_glass_panels.clone().into(),
                             style: child_sprite_style.clone(),
-                            ..ImageBundle::default()
+                            ..default()
                         },
                         Animator::new(panels_tween),
                         Name::new("Stained Glass Panel"),
@@ -627,7 +618,7 @@ mod dialog_panel {
                         ImageBundle {
                             image: dialog_panel_resources.background.clone().into(),
                             style: child_sprite_style.clone(),
-                            ..ImageBundle::default()
+                            ..default()
                         },
                         Name::new("Wall Background"),
                     ));
@@ -636,7 +627,7 @@ mod dialog_panel {
                         ImageBundle {
                             image: dialog_panel_resources.stained_glass_opened.clone().into(),
                             style: child_sprite_style.clone(),
-                            ..ImageBundle::default()
+                            ..default()
                         },
                         Name::new("Stained Glass Static"),
                     ));
@@ -645,7 +636,7 @@ mod dialog_panel {
                         ImageBundle {
                             image: dialog_panel_resources.chandelier.clone().into(),
                             style: child_sprite_style,
-                            ..ImageBundle::default()
+                            ..default()
                         },
                         Name::new("Light"),
                     ));
@@ -663,9 +654,9 @@ mod dialog_panel {
                                 flex_direction: FlexDirection::Column,
                                 align_items: AlignItems::FlexStart,
                                 justify_content: JustifyContent::FlexEnd,
-                                ..Style::default()
+                                ..default()
                             },
-                            ..ImageBundle::default()
+                            ..default()
                         },
                         Scroll {
                             current_frame: 0,
@@ -703,9 +694,9 @@ mod dialog_panel {
                                     ..UiRect::default()
                                 },
                                 size: Size::new(Val::Px(300.0), Val::Percent(100.0)),
-                                ..Style::default()
+                                ..default()
                             },
-                            ..TextBundle::default()
+                            ..default()
                         });
                     })
                     // .insert(DialogBox::new(dialog[0].clone(), DIALOG_BOX_UPDATE_DELTA_S))
@@ -720,7 +711,7 @@ mod dialog_panel {
                     //             .clone_weak()
                     //             .into(),
                     //         style: child_sprite_style.clone(),
-                    //         ..ImageBundle::default()
+                    //         ..default()
                     //     });
 
                     // Player Scroll
@@ -739,9 +730,9 @@ mod dialog_panel {
                                     flex_direction: FlexDirection::Column,
                                     align_items: AlignItems::FlexStart,
                                     justify_content: JustifyContent::FlexEnd,
-                                    ..Style::default()
+                                    ..default()
                                 },
-                                ..ImageBundle::default()
+                                ..default()
                             },
                             Scroll {
                                 current_frame: 0,
@@ -810,9 +801,9 @@ mod dialog_panel {
                                                 Val::Px(300.0),
                                                 Val::Percent(100.0),
                                             ),
-                                            ..Style::default()
+                                            ..default()
                                         },
-                                        ..TextBundle::default()
+                                        ..default()
                                     });
                                 });
 
@@ -866,9 +857,9 @@ mod dialog_panel {
                                                 Val::Px(300.0),
                                                 Val::Percent(100.0),
                                             ),
-                                            ..Style::default()
+                                            ..default()
                                         },
-                                        ..TextBundle::default()
+                                        ..default()
                                     });
                                 });
 
@@ -922,9 +913,9 @@ mod dialog_panel {
                                                 Val::Px(300.0),
                                                 Val::Percent(100.0),
                                             ),
-                                            ..Style::default()
+                                            ..default()
                                         },
-                                        ..TextBundle::default()
+                                        ..default()
                                     });
                                 });
                         });
@@ -958,7 +949,7 @@ mod dialog_panel {
                     //     });
                 });
 
-            // check with system ordering if this event will be catch
+            // TOTEST: check with system ordering if this event will be catch
             create_scroll_content.send(UpdateScrollEvent);
         }
     }
@@ -1183,16 +1174,12 @@ mod dialog_player {
     use bevy::prelude::*;
     use bevy_tweening::Animator;
 
-    use fto_dialog::{
-        constants::ui::dialogs::*,
-        ui::{
-            dialog_system::init_tree_file,
-        },
-    };
+    use fto_dialog::ui::dialog_system::init_tree_file;
 
     use crate::{
         dialog_panel::DialogPanel,
-        dialog_scroll::{PlayerChoice, PlayerScroll, Scroll, UpdateScrollEvent, UpperScroll}
+        dialog_scroll::{PlayerChoice, PlayerScroll, Scroll, UpdateScrollEvent, UpperScroll},
+        constants::ui::dialogs::{PRESSED_BUTTON, HOVERED_BUTTON, NORMAL_BUTTON}
     };
 
     /// Happens when
@@ -1477,9 +1464,11 @@ mod dialog_scroll {
 
     use bevy::prelude::*;
 
-    use fto_dialog::constants::ui::dialogs::SCROLL_ANIMATION_FRAMES_NUMBER;
-
-    use crate::{dialog_box::ResetDialogBoxEvent, dialog_panel::DialogPanelResources};
+    use crate::{
+        dialog_box::ResetDialogBoxEvent,
+        dialog_panel::DialogPanelResources,
+        constants::ui::dialogs::SCROLL_ANIMATION_FRAMES_NUMBER
+    };
 
     /// Any scroll should have this component.
     ///
@@ -1653,4 +1642,63 @@ mod dialog_scroll {
             // send event to close (reverse open) upper scroll ?
         }
     }
+}
+
+mod constants {
+
+pub const CLEAR: bevy::render::color::Color = bevy::render::color::Color::rgb(0.1, 0.1, 0.1);
+
+pub const FIXED_TIME_STEP: f32 = 1. / 60.;
+
+pub const HEIGHT: f32 = 720.;
+pub const RESOLUTION: f32 = 16. / 9.;
+
+pub mod character {
+    pub mod dialog {
+        // Flibittygibbit
+
+        pub const FABIEN_DIALOG: &str = "# Fabien
+
+- Hello
+
+## Fabien
+
+- /<3
+
+### Morgan
+
+- Hey | None
+- No Hello | None
+- Want to share a flat ? | None
+
+#### Fabien
+
+- :)
+
+#### Fabien
+
+- :O
+
+#### Fabien
+
+- Sure\n";
+
+        }
+}
+
+pub mod ui {
+    pub mod dialogs {
+        use bevy::prelude::Color;
+
+        pub const DIALOG_PANEL_ANIMATION_OFFSET: f32 = -1000.;
+        pub const DIALOG_BOX_UPDATE_DELTA_S: f32 = 0.05;
+        pub const DIALOG_PANEL_ANIMATION_TIME_MS: u64 = 500;
+        pub const SCROLL_ANIMATION_DELTA_S: f32 = 0.1;
+        pub const SCROLL_ANIMATION_FRAMES_NUMBER: usize = 45;
+
+        pub const NORMAL_BUTTON: Color = Color::rgba(0.01, 0.01, 0.01, 0.01);
+        pub const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
+        pub const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
+    }
+}
 }
