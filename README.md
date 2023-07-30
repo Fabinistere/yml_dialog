@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This project also follows to [A successful Git branching model](https://nvie.com/posts/a-successful-git-branching-model/).
 
+We have to respect all the [rust API convention](https://rust-lang.github.io/api-guidelines/checklist.html).
+Run `cargo clippy` as frequently as possible.
+
 ## License
 
 This project is free, open source and permissively licensed!
