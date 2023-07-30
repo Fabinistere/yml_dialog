@@ -30,10 +30,7 @@ this is not a trivial question.
 
 ## Example
 
-```rust
-#[derive(Component)]
-struct DialogNode
-```
+For the moment, [download assets here](https://cloud.disroot.org/s/NtTonGcxpeyjkwp), clone the repo, extract the assets in the root of the repo and run `cargo run --example complete_example`
 
 ## Contribute
 
