@@ -280,13 +280,8 @@ pub struct DialogNode {
     ///
     /// can be an npc OR a player.
     ///
-    /// The u32 is the id of the entity,
     /// The String is their name
-    ///
-    /// # Note
-    ///
-    /// REFACTOR: Remove the execution-time known variable id
-    pub author: Option<(u32, String)>,
+    pub author: Option<String>,
     pub children: Vec<Rc<RefCell<DialogNode>>>,
     /// maybe too much (prefer a stack in the TreeIterator)
     pub parent: Option<Rc<RefCell<DialogNode>>>,
@@ -326,7 +321,7 @@ impl DialogNode {
         self.children.push(new_node);
     }
 
-    pub fn author(&self) -> Option<(u32, String)> {
+    pub fn author(&self) -> Option<String> {
         self.author.clone()
     }
 
@@ -373,7 +368,7 @@ impl DialogNode {
         let mut res = headers.clone();
 
         let character: String = match &self.author {
-            Some((_id, name)) => " ".to_string() + name,
+            Some(name) => " ".to_string() + name,
 
             None => String::from(" Narator"),
         };
@@ -451,6 +446,7 @@ impl DialogNode {
     }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum InitPhase {
     AuthorPhase,
     ContentPhase,
@@ -607,7 +603,7 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
 
     let mut author = String::new();
     let mut save = String::new();
-    // k, e, karma or event
+    // k/karma or e/event
     let mut condition = DialogCondition::default();
     // CANT due to reading text one letter/number by one: avoid using karma as a string into .parse::<i32>().unwrap()
     // let mut negative_karma = false;
@@ -624,14 +620,11 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
     let mut header_numbers = 0;
     let mut last_header_numbers = 0;
 
-    // REFACTOR: Use InitPhase
-    let mut author_phase = false;
-    let mut content_phase = false;
-    let mut condition_phase = false;
+    let mut phase: Option<InitPhase> = None;
 
     let mut karma_phase = false;
     let mut event_phase = false;
-    // allow to write `event:` or `ejhlksdfh:` instend of `e:`
+    // allow to write `e:` or `ejhlksdfh:` instead of `event:`
     let mut post_colon = false;
 
     let mut trigger_phase = false;
@@ -649,35 +642,29 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
     {
         // println!("c: {}", *c);
 
-        if (condition_phase || author_phase) && content_phase || (author_phase && condition_phase) {
-            panic!("Illegal Combinaison of phase; author phase: {}, content phase: {}, condition phase: {}",
-            author_phase, content_phase, condition_phase);
-        }
-
         /* -------------------------------------------------------------------------- */
         /*                                 Transitions                                */
         /* -------------------------------------------------------------------------- */
 
         if *c == '#' && !except {
             header_numbers += 1;
-            author_phase = true;
+            phase = Some(InitPhase::AuthorPhase);
         }
-        // !condition_phase to permit negative number in the karma threshold
-        else if *c == '-' && !condition_phase && !except {
-            content_phase = true;
-        } else if *c == '>' && content_phase && !except {
-            content_phase = false;
+        // phase != InitPhase::ConditionPhase to permit negative number in the karma threshold
+        else if *c == '-' && phase != Some(InitPhase::ConditionPhase) && !except {
+            phase = Some(InitPhase::ContentPhase);
+        } else if *c == '>' && phase == Some(InitPhase::ContentPhase) && !except {
+            phase = None;
             trigger_phase = true;
-        } else if *c == '|' && content_phase && !except {
+        } else if *c == '|' && phase == Some(InitPhase::ContentPhase) && !except {
             while save.starts_with(' ') {
                 save.remove(0);
             }
 
             dialog_type = DialogType::new_choice();
 
-            condition_phase = true;
-            content_phase = !content_phase;
-        } else if *c == ',' && karma_phase && condition_phase {
+            phase = Some(InitPhase::ConditionPhase);
+        } else if *c == ',' && karma_phase && phase == Some(InitPhase::ConditionPhase) {
             // can be solved with karma_min, karma_max
             // println!("karma 1rst elem: {}", karma);
             let k: i32;
@@ -697,7 +684,7 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
         //
         // End of Phase
         //
-        else if *c == '\n' && author_phase {
+        else if *c == '\n' && phase == Some(InitPhase::AuthorPhase) {
             while author.starts_with(' ') {
                 author.remove(0);
             }
@@ -747,7 +734,7 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
             }
 
             // REFACTOR: give the real entity_id or remove id
-            current.borrow_mut().author = Some((0, author.to_owned()));
+            current.borrow_mut().author = Some(author.to_owned());
 
             author.clear();
 
@@ -755,7 +742,7 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
             header_numbers = 0;
 
             except = false;
-            author_phase = false;
+            phase = None;
         } else if *c == ';' && karma_phase {
             // println!("karma: {}", karma);
             let k: i32 = if karma == *"MAX" || karma == *"max" {
@@ -800,7 +787,7 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
             if *c == ';' {
                 event_phase = false;
             }
-        } else if *c == '\n' && condition_phase && dialog_type.is_choice()
+        } else if *c == '\n' && phase == Some(InitPhase::ConditionPhase) && dialog_type.is_choice()
         // && !karma_phase
         // && !event_phase
         {
@@ -829,12 +816,12 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
 
             current.borrow_mut().dialog_type.push(choice);
 
-            condition_phase = false;
+            phase = None;
 
             save.clear();
             condition = DialogCondition::default();
         } else if *c == '\n'
-            && content_phase
+            && phase == Some(InitPhase::ContentPhase)
             && !save.is_empty()
             && dialog_type.is_text()
             && !except
@@ -856,7 +843,7 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
 
             save.clear();
 
-            content_phase = false;
+            phase = None;
         } else if (*c == ',' || *c == '\n') && trigger_phase {
             // println!("event : {}", event);
             let e = event.parse::<ThrowableEvent>().unwrap();
@@ -879,7 +866,7 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
                 except = true;
             }
             // `;` or `\n` put an end to the selection of condtion
-            else if condition_phase {
+            else if phase == Some(InitPhase::ConditionPhase) {
                 if *c == 'k' {
                     karma_phase = true;
                     post_colon = true;
@@ -916,11 +903,8 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
 
                 dialog_type = DialogType::new_text();
 
-                author_phase = false;
-                content_phase = false;
-                // useless protection cause by if condition_phase just above
-                // condition_phase = false;
-            } else if author_phase && *c != '#' {
+                phase = None;
+            } else if phase == Some(InitPhase::AuthorPhase) && *c != '#' {
                 author.push(*c);
             }
             // if !is_special_char_file(*c) || (is_special_char_file(*c) && except)

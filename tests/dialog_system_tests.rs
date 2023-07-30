@@ -10,8 +10,8 @@ const KARMA_MIN: i32 = -KARMA_MAX;
 
 #[test]
 fn test_print_from_file() {
-    let fabien = Some((0, String::from("Fabien")));
-    let morgan = Some((1, String::from("Morgan")));
+    let fabien = Some(String::from("Fabien"));
+    let morgan = Some(String::from("Morgan"));
 
     let dialog = Rc::new(RefCell::new(DialogNode {
         dialog_type: vec![DialogType::Text(String::from("Hello"))],
@@ -105,7 +105,7 @@ fn test_print_from_file_monologue() {
 fn test_init_tree_from_file_simple_text_1() {
     let root = init_tree_file(String::from("# Olf\n\n- Hello\n"));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Olf"))));
+    assert_eq!(root.borrow().author, Some(String::from("Olf")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -117,7 +117,7 @@ fn test_init_tree_from_file_simple_text_1() {
 fn test_init_tree_from_file_space_overdose_1() {
     let root = init_tree_file(String::from("#            Olf\n\n-      Hello\n"));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Olf"))));
+    assert_eq!(root.borrow().author, Some(String::from("Olf")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -131,7 +131,7 @@ fn test_init_tree_from_file_space_overdose_2() {
         "# Morgan\n\n- Hello         |   None\n- No Hello    | None\n",
     ));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -152,7 +152,7 @@ fn test_init_tree_from_file_space_overdose_2() {
 fn test_init_tree_from_file_space_deficiency_1() {
     let root = init_tree_file(String::from("#Olf\n\n-Hello\n"));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Olf"))));
+    assert_eq!(root.borrow().author, Some(String::from("Olf")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -164,7 +164,7 @@ fn test_init_tree_from_file_space_deficiency_1() {
 fn test_init_tree_from_file_space_deficiency_2() {
     let root = init_tree_file(String::from("# Morgan\n\n- Hello|None\n- No Hello|None\n"));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -187,7 +187,7 @@ fn test_init_tree_from_file_monologue_1() {
         "# Morgan\n\n- Hello\n- I was wondering\n-Alone...\n",
     ));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -205,7 +205,7 @@ fn test_init_tree_from_file_simple_choice_1() {
         "# Morgan\n\n- Hello | None\n- No Hello | None\n",
     ));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -228,7 +228,7 @@ fn test_init_tree_from_file_complex_choice_1() {
         "# Morgan\n\n- Hello | None\n- No Hello | k: -10,0;\n",
     ));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -251,7 +251,7 @@ fn test_init_tree_from_file_complex_choice_2() {
         "# Morgan\n\n- Hello | None\n- Mary me Hugo. | e: HasCharisma;\n",
     ));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -280,7 +280,7 @@ fn test_init_tree_from_file_complex_choice_3() {
         "# Morgan\n\n- Hello | k: -50,100;\n- No Hello | karma : -100,0;\n",
     ));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -303,7 +303,7 @@ fn test_init_tree_from_file_complex_choice_4() {
                 "# Morgan\n\n- Hello my Friend | e: HasFriend;\n- You droped this (*crown*) | event: HasCharisma;\n",
             ));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -331,7 +331,7 @@ fn test_init_tree_from_file_complex_choice_karma_max_min() {
         "# Morgan\n\n- Hello | k: -10,MAX;\n- No Hello | k: MIN,0;\n",
     ));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -354,10 +354,10 @@ fn test_init_tree_from_file_simple_kinship_1() {
         "# Morgan\n\n- Hello\n## Hugo\n- Hey! How are you ?\n",
     ));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
     assert_eq!(
         root.borrow().children[0].borrow().author,
-        Some((0, String::from("Hugo")))
+        Some(String::from("Hugo"))
     );
 
     assert_eq!(
@@ -374,7 +374,7 @@ fn test_init_tree_from_file_simple_kinship_1() {
 fn test_init_tree_from_file_monologue_2() {
     let root = init_tree_file(String::from("# Morgan\n\n- Hello\n- I was wondering\n\n## Morgan\n\n- With Friends ! | event: HasFriend;\n- Alone... | None\n"));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
     assert_eq!(
         root.borrow().dialog_type,
@@ -386,7 +386,7 @@ fn test_init_tree_from_file_monologue_2() {
 
     assert_eq!(
         root.borrow().children[0].borrow().author,
-        Some((0, String::from("Morgan")))
+        Some(String::from("Morgan"))
     );
 
     assert_eq!(
@@ -410,7 +410,7 @@ fn test_init_tree_from_file_complex_kinship_1() {
                 "# Morgan\n\n- Hello | None\n- Do you want to work with me ? | None\n\n## Hugo\n\n- Hey! How are you ?\n\n## Hugo\n\n- I'm sure you'll do just fine without me.\n",
             ));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
     assert_eq!(
         root.borrow().dialog_type,
         vec![
@@ -431,7 +431,7 @@ fn test_init_tree_from_file_complex_kinship_1() {
 
     assert_eq!(
         root.borrow().children[0].borrow().author,
-        Some((0, String::from("Hugo")))
+        Some(String::from("Hugo"))
     );
     assert_eq!(
         root.borrow().children[0].borrow().dialog_type,
@@ -440,7 +440,7 @@ fn test_init_tree_from_file_complex_kinship_1() {
 
     assert_eq!(
         root.borrow().children[1].borrow().author,
-        Some((0, String::from("Hugo")))
+        Some(String::from("Hugo"))
     );
     assert_eq!(
         root.borrow().children[1].borrow().dialog_type,
@@ -458,7 +458,7 @@ fn test_init_tree_from_file_throwable_event_1() {
                 "# Morgan\n\n- Let's Talk | None\n- Let's Fight | None\n\n## Hugo\n\n- :)\n\n-> HasFriend\n\n## Hugo\n\n- :(\n\n-> FightEvent\n",
             ));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
     assert_eq!(
         root.borrow().dialog_type,
         vec![
@@ -480,7 +480,7 @@ fn test_init_tree_from_file_throwable_event_1() {
     // first child
     assert_eq!(
         root.borrow().children[0].borrow().author,
-        Some((0, String::from("Hugo")))
+        Some(String::from("Hugo"))
     );
     assert_eq!(
         root.borrow().children[0].borrow().dialog_type,
@@ -494,7 +494,7 @@ fn test_init_tree_from_file_throwable_event_1() {
     // second child
     assert_eq!(
         root.borrow().children[1].borrow().author,
-        Some((0, String::from("Hugo")))
+        Some(String::from("Hugo"))
     );
     assert_eq!(
         root.borrow().children[1].borrow().dialog_type,
@@ -512,7 +512,7 @@ fn test_init_tree_from_file_except_1() {
         "# Morgan\n\n- Bonjour Florian. /\nComment vas/-tu :/# ? /\nJ'ai faim. /<3 /</|3\n",
     ));
 
-    assert_eq!(root.borrow().author, Some((0, String::from("Morgan"))));
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
     assert_eq!(
         root.borrow().dialog_type,

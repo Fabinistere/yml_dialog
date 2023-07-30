@@ -228,7 +228,7 @@ fn dialog_dive(
                     Some(ref mut current_node) => {
                         let dialog_tree = init_tree_file(current_node.to_owned());
 
-                        if dialog_tree.borrow().author().unwrap().1 == "Player" {
+                        if dialog_tree.borrow().author().unwrap() == "Player" {
                             let mut player_panel = player_panel_query.single_mut();
                             match player_panel.clone() {
                                 // The monologue is not finished
@@ -356,7 +356,7 @@ fn update_dialog_panel(
                                     ),
                                 }
                         }
-                        if &current.author().unwrap().1 == "Player" {
+                        if &current.author().unwrap() == "Player" {
                             *player_panel = PlayerPanel::Texts(texts)
                         } else {
                             // replace the entire npc panel's content
