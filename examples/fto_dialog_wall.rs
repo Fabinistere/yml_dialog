@@ -2,7 +2,7 @@ use bevy::{prelude::*,winit::WinitSettings, render::texture::ImagePlugin, window
 use bevy_tweening::TweeningPlugin;
 
 use constants::{FIXED_TIME_STEP, CLEAR, HEIGHT, RESOLUTION, character::dialog::FABIEN_DIALOG};
-use fto_dialog::ui::dialog_system::Dialog;
+use fto_dialog::Dialog;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 pub enum GameState {
@@ -276,7 +276,7 @@ mod dialog_panel {
     use bevy_tweening::{lens::UiPositionLens, *};
     use std::time::Duration;
 
-    use fto_dialog::ui::dialog_system::{init_tree_file, Dialog, DialogType};
+    use fto_dialog::{init_tree_file, Dialog, DialogType};
 
     use crate::{
         dialog_scroll::{
@@ -1169,7 +1169,7 @@ mod dialog_player {
     use bevy::prelude::*;
     use bevy_tweening::Animator;
 
-    use fto_dialog::ui::dialog_system::init_tree_file;
+    use fto_dialog::init_tree_file;
 
     use crate::{
         dialog_panel::DialogPanel,

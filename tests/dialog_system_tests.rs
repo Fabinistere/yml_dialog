@@ -3,7 +3,7 @@
 // extern crate ui;
 use std::{cell::RefCell, rc::Rc};
 
-use fto_dialog::ui::dialog_system::*;
+use fto_dialog::*;
 
 const KARMA_MAX: i32 = 100;
 const KARMA_MIN: i32 = -KARMA_MAX;

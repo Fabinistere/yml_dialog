@@ -9,7 +9,7 @@ use bevy::{
     window::WindowResolution,
     winit::WinitSettings,
 };
-use fto_dialog::ui::dialog_system::{init_tree_file, DialogType};
+use fto_dialog::{init_tree_file, DialogType};
 
 // dark purple #25131a = 39/255, 19/255, 26/255
 const CLEAR: bevy::render::color::Color = bevy::render::color::Color::rgb(0.153, 0.07, 0.102);
