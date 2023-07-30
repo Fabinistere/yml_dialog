@@ -9,7 +9,7 @@ use bevy::{
     window::WindowResolution,
     winit::WinitSettings,
 };
-use fto_dialog::ui::dialog_system::{init_tree_file, DialogType};
+use fto_dialog::{init_tree_file, DialogType};
 
 // dark purple #25131a = 39/255, 19/255, 26/255
 const CLEAR: bevy::render::color::Color = bevy::render::color::Color::rgb(0.153, 0.07, 0.102);
@@ -228,7 +228,7 @@ fn dialog_dive(
                     Some(ref mut current_node) => {
                         let dialog_tree = init_tree_file(current_node.to_owned());
 
-                        if dialog_tree.borrow().author().unwrap().1 == "Player" {
+                        if dialog_tree.borrow().author().unwrap() == "Player" {
                             let mut player_panel = player_panel_query.single_mut();
                             match player_panel.clone() {
                                 // The monologue is not finished
@@ -356,7 +356,7 @@ fn update_dialog_panel(
                                     ),
                                 }
                         }
-                        if &current.author().unwrap().1 == "Player" {
+                        if &current.author().unwrap() == "Player" {
                             *player_panel = PlayerPanel::Texts(texts)
                         } else {
                             // replace the entire npc panel's content
@@ -393,6 +393,11 @@ fn update_dialog_panel(
                         }
                         // update the player_panel
                         *player_panel = PlayerPanel::Choices(choices);
+
+                        // Remove all text which aren't said by the current interlocutor
+                        if current_interlocutor.is_changed() {
+                            npc_panel.texts.clear();
+                        }
                     }
                 }
             }
