@@ -151,7 +151,7 @@ mod dialog_box {
             }
         }
 
-        // Same as new but keep the signature
+        // /// Same as new but keep the signature
         // fn reset(&self, text: String, update_time: f32) {
         //     *self.text = text;
         //     *self.progress = 0;
@@ -1096,13 +1096,8 @@ mod dialog_panel {
         for panel in dialog_panel_query.iter() {
             let interlocutor = panel.main_interlocutor;
             let new_dialog_tree = panel.dialog_tree.clone();
-            match interlocutor_query.get_mut(interlocutor) {
-                Ok((_entity, mut dialog)) => dialog.current_node = Some(new_dialog_tree),
-                Err(e) => warn!(
-                    "The entity linked with the Ui Wall doesn't have any Dialog Component: {:?}",
-                    e
-                ),
-            }
+            let (_entity, mut dialog) = interlocutor_query.get_mut(interlocutor).unwrap();
+            dialog.current_node = Some(new_dialog_tree);
         }
     }
 
@@ -1187,6 +1182,7 @@ mod dialog_player {
     ///     - Choice selected
     ///   - ui::dialog_player::skip_forward_dialog
     ///     - P pressed
+    ///
     /// Read in
     ///   - ui::dialog_player::dialog_dive
     ///     - analyze the current node;
@@ -1516,6 +1512,7 @@ mod dialog_scroll {
     ///     ( except when the d. tree is empty )
     ///   - ui::dialog_player::drop_first_text_upper_scroll
     ///     - ask to update the upper scroll after droping one text
+    ///
     /// Read in
     ///   - ui::dialog_panel::update_upper_scroll
     ///     - create a dialogBox with the text contained in the UpperScroll,
@@ -1624,7 +1621,7 @@ mod dialog_scroll {
                     for (place, choice) in player_scroll.choices.iter().enumerate() {
                         // FIXME: CRASH HERE OutOfBound if place > 3 (view the refactor above)
                         if place > 3 {
-                            continue;
+                            break;
                         }
 
                         // The button's visibility is based on the size
@@ -1645,60 +1642,59 @@ mod dialog_scroll {
 }
 
 mod constants {
+    pub const CLEAR: bevy::render::color::Color = bevy::render::color::Color::rgb(0.1, 0.1, 0.1);
 
-pub const CLEAR: bevy::render::color::Color = bevy::render::color::Color::rgb(0.1, 0.1, 0.1);
+    pub const FIXED_TIME_STEP: f32 = 1. / 60.;
 
-pub const FIXED_TIME_STEP: f32 = 1. / 60.;
+    pub const HEIGHT: f32 = 720.;
+    pub const RESOLUTION: f32 = 16. / 9.;
 
-pub const HEIGHT: f32 = 720.;
-pub const RESOLUTION: f32 = 16. / 9.;
+    pub mod character {
+        pub mod dialog {
+            // Flibittygibbit
 
-pub mod character {
-    pub mod dialog {
-        // Flibittygibbit
+            pub const FABIEN_DIALOG: &str = "# Fabien
 
-        pub const FABIEN_DIALOG: &str = "# Fabien
+    - Hello
 
-- Hello
+    ## Fabien
 
-## Fabien
+    - /<3
 
-- /<3
+    ### Morgan
 
-### Morgan
+    - Hey | None
+    - No Hello | None
+    - Want to share a flat ? | None
 
-- Hey | None
-- No Hello | None
-- Want to share a flat ? | None
+    #### Fabien
 
-#### Fabien
+    - :)
 
-- :)
+    #### Fabien
 
-#### Fabien
+    - :O
 
-- :O
+    #### Fabien
 
-#### Fabien
+    - Sure\n";
 
-- Sure\n";
-
-        }
-}
-
-pub mod ui {
-    pub mod dialogs {
-        use bevy::prelude::Color;
-
-        pub const DIALOG_PANEL_ANIMATION_OFFSET: f32 = -1000.;
-        pub const DIALOG_BOX_UPDATE_DELTA_S: f32 = 0.05;
-        pub const DIALOG_PANEL_ANIMATION_TIME_MS: u64 = 500;
-        pub const SCROLL_ANIMATION_DELTA_S: f32 = 0.1;
-        pub const SCROLL_ANIMATION_FRAMES_NUMBER: usize = 45;
-
-        pub const NORMAL_BUTTON: Color = Color::rgba(0.01, 0.01, 0.01, 0.01);
-        pub const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
-        pub const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
+            }
     }
-}
+
+    pub mod ui {
+        pub mod dialogs {
+            use bevy::prelude::Color;
+
+            pub const DIALOG_PANEL_ANIMATION_OFFSET: f32 = -1000.;
+            pub const DIALOG_BOX_UPDATE_DELTA_S: f32 = 0.05;
+            pub const DIALOG_PANEL_ANIMATION_TIME_MS: u64 = 500;
+            pub const SCROLL_ANIMATION_DELTA_S: f32 = 0.1;
+            pub const SCROLL_ANIMATION_FRAMES_NUMBER: usize = 45;
+
+            pub const NORMAL_BUTTON: Color = Color::rgba(0.01, 0.01, 0.01, 0.01);
+            pub const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
+            pub const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
+        }
+    }
 }
