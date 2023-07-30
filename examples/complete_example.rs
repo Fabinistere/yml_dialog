@@ -393,6 +393,11 @@ fn update_dialog_panel(
                         }
                         // update the player_panel
                         *player_panel = PlayerPanel::Choices(choices);
+
+                        // Remove all text which aren't said by the current interlocutor
+                        if current_interlocutor.is_changed() {
+                            npc_panel.texts.clear();
+                        }
                     }
                 }
             }
