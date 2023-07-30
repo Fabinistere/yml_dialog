@@ -16,53 +16,53 @@
 
 use std::{cell::RefCell, fmt, rc::Rc, str::FromStr};
 
-use bevy::prelude::{info, warn, Component};
+use bevy::prelude::{info, warn, Component, Deref, DerefMut};
 
 const KARMA_MAX: i32 = 100;
 const KARMA_MIN: i32 = -KARMA_MAX;
 
-/// Points to the current DialogNode the npc is in.
+/// Contains the current Dialog node of the interlocutor's talk.
 ///
 /// Holds a String which can be converted to a Rc<RefCell<DialogNode>>
-/// by print_file()
+/// by `print_file()`
 ///
 /// # Example
 ///
+/// IDEA: In the example, put the struct into a `commands.spawn((...))` method
+///
 /// ```rust
+/// # main() -> Result<(), std::num::ParseIntError> {
+/// # use fto_dialog::ui::dialog_system::Dialog;
 /// Dialog {
-///      current_node: Some(
-/// "# Fabien
-///
-/// - Hello
-///
-/// ## Morgan
-///
-/// - Hey | None
-/// - No Hello | None
-/// - Want to share a flat ? | None
-///
-/// ### Fabien
-///
-/// - :)
-///
-/// ### Fabien
-///
-/// - :O
-///
-/// ### Fabien
-///
-/// - Sure"
-/// .to_string())
+///     current_node: Some("# Fabien\n\n- Hello\n".to_string())
 /// }
-///
+/// #     Ok(())
+/// # }
 /// ```
-#[derive(Component, PartialEq, Clone, Debug)]
+///
+/// # Note
+///
+/// DOC: Struct might be useless
+///
+/// To extend this `Component`, don't import it.... and create your own.
+///
+/// ```rust
+/// # main() -> Result<(), std::num::ParseIntError> {
+/// \#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default, Component)]
+/// struct YourDialog {
+///     root: Option<String>,
+///     current_node: Option<String>,
+/// }
+/// #     Ok(())
+/// # }
+/// ```
+#[derive(Deref, DerefMut, PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default, Component)]
 pub struct Dialog {
     pub current_node: Option<String>,
 }
 
 impl Dialog {
-    /// TODO: feature - Read at dialog_file instead of CST
+    /// TODO: feature - Read at dialog_file
     pub fn new(str: &str) -> Dialog {
         Dialog {
             current_node: Some(str.to_string()),
@@ -270,6 +270,10 @@ pub struct DialogNode {
     ///   to take over the ambiance
     ///   - it will permit more life and warm content,
     ///   some not cold npc to grow with the place
+    ///
+    /// # Note
+    ///
+    /// DOC: Rename DialogNode's field: dialog_type
     pub dialog_type: Vec<DialogType>,
     /// Actor / Actress
     ///
@@ -281,7 +285,7 @@ pub struct DialogNode {
     /// # Note
     ///
     /// REFACTOR: Remove the execution-time known variable id
-    pub character: Option<(u32, String)>,
+    pub author: Option<(u32, String)>,
     pub children: Vec<Rc<RefCell<DialogNode>>>,
     /// maybe too much (prefer a stack in the TreeIterator)
     pub parent: Option<Rc<RefCell<DialogNode>>>,
@@ -289,13 +293,17 @@ pub struct DialogNode {
 }
 
 impl DialogNode {
+    // pub fn is_empty(&self) -> bool {
+    //     self.dialog_type.is_empty()
+    // }
+
     pub fn is_end_node(&self) -> bool {
         self.children.is_empty()
     }
 
     /// # Return
     ///
-    /// true if the type of the first element (of dialog_type) is choice
+    /// `true` if the type of the first element (of dialog_type) is choice
     pub fn is_choice(&self) -> bool {
         if !self.dialog_type.is_empty() {
             return self.dialog_type[0].is_choice();
@@ -305,7 +313,7 @@ impl DialogNode {
 
     /// # Return
     ///
-    /// true if the type of the first element (of dialog_type) is choice
+    /// `true` if the type of the first element (of dialog_type) is choice
     pub fn is_text(&self) -> bool {
         if !self.dialog_type.is_empty() {
             return self.dialog_type[0].is_text();
@@ -315,6 +323,10 @@ impl DialogNode {
 
     pub fn add_child(&mut self, new_node: Rc<RefCell<DialogNode>>) {
         self.children.push(new_node);
+    }
+
+    pub fn author(&self) -> Option<(u32, String)> {
+        self.author.clone()
     }
 
     /// # Convention
@@ -359,7 +371,7 @@ impl DialogNode {
     fn print_file_aux(&self, headers: String) -> String {
         let mut res = headers.clone();
 
-        let character: String = match &self.character {
+        let character: String = match &self.author {
             Some((_id, name)) => " ".to_string() + name,
 
             None => String::from(" Narator"),
@@ -389,7 +401,7 @@ impl DialogNode {
                         match &dialog_condition.event {
                             Some(events) => {
                                 if !events.is_empty() {
-                                    // plurial ?
+                                    // DOC: events in plurial ?
                                     res.push_str("event: ");
                                     for event in events {
                                         res.push_str(&event.to_string());
@@ -411,8 +423,6 @@ impl DialogNode {
             res.push('\n');
         }
         res.push_str("\n\nEND");
-
-        // res = res.replace("\n\n\n", "\n\n");
 
         // event
 
@@ -438,6 +448,12 @@ impl DialogNode {
 
         res
     }
+}
+
+enum InitPhase {
+    AuthorPhase,
+    ContentPhase,
+    ConditionPhase,
 }
 
 /// # Argument
@@ -559,28 +575,27 @@ impl DialogNode {
 /// - Or maybe...
 /// - You want to fight me ?
 ///
-/// ### Morgan
+/// \## Morgan
 ///
 /// - Here my money | e: WonTheLottery;
 /// - You will feel my guitar | None
 /// - Call Homie | k: 10,MAX;
 ///
-/// #### Olf
+/// \### Olf
 ///
 /// - Thank you very much
 ///
-/// #### Olf
+/// \### Olf
 ///
 /// - Nice
 /// -> FightEvent
 ///
-/// #### Olf
+/// \### Olf
 ///
 /// - Not Nice
 /// -> FightEvent\n"
 ///     )
 /// );
-///
 /// #     Ok(())
 /// # }
 /// ```
@@ -608,6 +623,7 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
     let mut header_numbers = 0;
     let mut last_header_numbers = 0;
 
+    // REFACTOR: Use InitPhase
     let mut author_phase = false;
     let mut content_phase = false;
     let mut condition_phase = false;
@@ -729,8 +745,8 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
                 current = child;
             }
 
-            // TODO: give the real entity_id or remove id
-            current.borrow_mut().character = Some((0, author.to_owned()));
+            // REFACTOR: give the real entity_id or remove id
+            current.borrow_mut().author = Some((0, author.to_owned()));
 
             author.clear();
 
@@ -858,7 +874,7 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
         else if c.is_ascii() || c.is_alphanumeric() {
             // the except char is /
             if *c == '/' {
-                info!("except");
+                // info!("except");
                 except = true;
             }
             // `;` or `\n` put an end to the selection of condtion
