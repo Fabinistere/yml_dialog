@@ -60,7 +60,7 @@ fn spawn_camera(mut commands: Commands) {
 }
 
 fn spawn_player(mut commands: Commands) {
-    commands.spawn((Player, Karma(50), Dialog::new(FABIEN_DIALOG), Name::new("Player")));
+    commands.spawn((Player, Karma(50), Dialog::from_str(FABIEN_DIALOG), Name::new("Player")));
 }
 
 
@@ -276,7 +276,7 @@ mod dialog_panel {
     use bevy_tweening::{lens::UiPositionLens, *};
     use std::time::Duration;
 
-    use fto_dialog::{init_tree_file, Dialog, DialogType};
+    use fto_dialog::{init_tree_file, Dialog, DialogContent};
 
     use crate::{
         dialog_scroll::{
@@ -425,7 +425,7 @@ mod dialog_panel {
                 // keep track of player's personal thoughts
                 let (player, dialog) = player_query.single();
 
-                let dialog_tree: String = match &dialog.current_node {
+                let dialog_tree: String = match &dialog.current_node() {
                     Some(text) => text.to_owned(),
                     None => String::new(),
                 };
@@ -1010,21 +1010,21 @@ mod dialog_panel {
 
                 let current = &dialog_tree.borrow();
 
-                let dialogs = &current.dialog_type;
+                let dialogs = &current.dialog_content;
 
                 let (mut player_scroll, _player_scroll_entity) = player_scroll_query.single_mut();
 
-                // check the first elem of the DialogType's Vector
+                // check the first elem of the DialogContent's Vector
                 match &dialogs.first() {
                     None => {
                         // FIXME: handle this err
-                        panic!("Err: dialog_type is empty");
+                        panic!("Err: dialog_content is empty");
                     }
-                    Some(DialogType::Text(_)) => {
+                    Some(DialogContent::Text(_)) => {
                         let mut texts = Vec::<String>::new();
                         for dialog in dialogs.iter() {
                             match dialog {
-                            DialogType::Text(text) => {
+                            DialogContent::Text(text) => {
                                 texts.push(text.to_owned());
                                 info!("DEBUG: add text: {}", text);
                             }
@@ -1040,7 +1040,7 @@ mod dialog_panel {
                         // Clear the previous choice if there is any
                         player_scroll.choices.clear();
                     }
-                    Some(DialogType::Choice {
+                    Some(DialogContent::Choice {
                         text: _,
                         condition: _,
                     }) => {
@@ -1048,7 +1048,7 @@ mod dialog_panel {
                         let mut choices = Vec::<String>::new();
                         for dialog in dialogs.iter() {
                             match dialog {
-                            DialogType::Choice { text, condition } => {
+                            DialogContent::Choice { text, condition } => {
                                 match condition {
                                     Some(cond) => {
                                         let (_player, karma) = player_query.single();
@@ -1097,7 +1097,7 @@ mod dialog_panel {
             let interlocutor = panel.main_interlocutor;
             let new_dialog_tree = panel.dialog_tree.clone();
             let (_entity, mut dialog) = interlocutor_query.get_mut(interlocutor).unwrap();
-            dialog.current_node = Some(new_dialog_tree);
+            *dialog.current_node_mut() = Some(new_dialog_tree);
         }
     }
 
@@ -1152,7 +1152,7 @@ mod dialog_panel {
             // my own program wants me dead
 
             // let's overide update_dialog_tree, here and now.
-            dialog.current_node = Some(blank_dialog_tree);
+            *dialog.current_node_mut() = Some(blank_dialog_tree);
 
             // TODO: Close the Dialog
             close_dialog_panel_events.send(CloseDialogPanelEvent);

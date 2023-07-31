@@ -9,7 +9,7 @@ use bevy::{
     window::WindowResolution,
     winit::WinitSettings,
 };
-use fto_dialog::{init_tree_file, DialogType};
+use fto_dialog::{init_tree_file, DialogContent};
 
 // dark purple #25131a = 39/255, 19/255, 26/255
 const CLEAR: bevy::render::color::Color = bevy::render::color::Color::rgb(0.153, 0.07, 0.102);
@@ -339,15 +339,15 @@ fn update_dialog_panel(
                 let dialog_tree = init_tree_file(current_node.to_owned());
 
                 let current = &dialog_tree.borrow();
-                let dialogs = &current.dialog_type;
+                let dialogs = &current.dialog_content;
 
                 match &dialogs.first() {
-                    None => panic!("Err: dialog_type is empty"),
-                    Some(DialogType::Text(_)) => {
+                    None => panic!("Err: dialog_content is empty"),
+                    Some(DialogContent::Text(_)) => {
                         let mut texts = Vec::<String>::new();
                         for dialog in dialogs.iter() {
                             match dialog {
-                                    DialogType::Text(text) => {
+                                    DialogContent::Text(text) => {
                                         texts.push(text.to_owned());
                                         // info!("DEBUG: add text: {}", text);
                                     }
@@ -373,7 +373,7 @@ fn update_dialog_panel(
                         }
                     }
                     // NOTE: In this example, NPC can't have choice :0
-                    Some(DialogType::Choice {
+                    Some(DialogContent::Choice {
                         text: _,
                         condition: _,
                     }) => {
@@ -381,7 +381,7 @@ fn update_dialog_panel(
                         let mut choices = Vec::<String>::new();
                         for dialog in dialogs.iter() {
                             match dialog {
-                                DialogType::Choice { text, condition: _ } => {
+                                DialogContent::Choice { text, condition: _ } => {
                                     // We do not test the condition in this example
                                     choices.push(text.to_owned());
                                     // info!("DEBUG: add choice: {}", text);
