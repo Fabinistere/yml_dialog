@@ -7,16 +7,19 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 
 [dependencies]
+serde = "1.0"
+serde_yaml = "0.9"
+
+# ----------- Debug -----------
+log = "0.4.17"
+
+[dev-dependencies]
 bevy = "0.10" #  version = "0.10", git = "https://github.com/bevyengine/bevy", rev="9788b386c7846c99978ab5c1a33698ec5a471d84", default-features = false
 bevy_tweening = "0.7" # 0.8
 
-# image = "0.23"
-
-# rand = "0.8.5"
-
-# ----------- Debug -----------
-bevy-inspector-egui = "0.18"
-log = "0.4.17"
+# -- EnumIter --
+strum = "0.17.1"
+strum_macros = "0.17.1"
 
 # Enable high optimizations for dependencies (incl. Bevy), but not for our code:
 [profile.dev.package."*"]

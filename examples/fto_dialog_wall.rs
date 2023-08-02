@@ -1,8 +1,12 @@
+use std::{fmt, str::FromStr};
+
 use bevy::{prelude::*,winit::WinitSettings, render::texture::ImagePlugin, window::WindowResolution};
 use bevy_tweening::TweeningPlugin;
 
-use constants::{FIXED_TIME_STEP, CLEAR, HEIGHT, RESOLUTION, character::dialog::FABIEN_DIALOG};
-use fto_dialog::Dialog;
+use constants::{FIXED_TIME_STEP, CLEAR, HEIGHT, RESOLUTION, character::{dialog::FABIEN_DIALOG, KARMA_MIN, KARMA_MAX}};
+use fto_dialog::DialogCustomInfos;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 pub enum GameState {
@@ -19,6 +23,113 @@ pub struct Player;
 
 #[derive(Component)]
 pub struct NPC;
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, EnumIter)]
+enum WorldEvent {
+    BeatTheGame,
+    FirstKill,
+    AreaCleared,
+    HasCharisma,
+    HasFriend,
+}
+
+impl fmt::Display for WorldEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            WorldEvent::BeatTheGame => write!(f, "BeatTheGame"),
+            WorldEvent::FirstKill => write!(f, "FirstKill"),
+            WorldEvent::AreaCleared => write!(f, "AreaCleared"),
+            WorldEvent::HasCharisma => write!(f, "HasCharisma"),
+            WorldEvent::HasFriend => write!(f, "HasFriend"),
+        }
+    }
+}
+
+impl FromStr for WorldEvent {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<WorldEvent, Self::Err> {
+        match input {
+            "BeatTheGame" => Ok(WorldEvent::BeatTheGame),
+            "FirstKill" => Ok(WorldEvent::FirstKill),
+            "AreaCleared" => Ok(WorldEvent::AreaCleared),
+            "HasCharisma" => Ok(WorldEvent::HasCharisma),
+            "HasFriend" => Ok(WorldEvent::HasFriend),
+            _ => Err(()),
+        }
+    }
+}
+
+/// List all triggerable event,
+/// that can be send when quitting a dialog node
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, EnumIter)]
+enum TriggerEvent {
+    FightEvent,
+    HasFriend,
+}
+impl fmt::Display for TriggerEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TriggerEvent::FightEvent => write!(f, "FightEvent"),
+            TriggerEvent::HasFriend => write!(f, "HasFriend"),
+        }
+    }
+}
+
+impl FromStr for TriggerEvent {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<TriggerEvent, Self::Err> {
+        match input {
+            "FightEvent" => Ok(TriggerEvent::FightEvent),
+            "HasFriend" => Ok(TriggerEvent::HasFriend),
+            _ => Err(()),
+        }
+    }
+}
+
+/// Contains the current Dialog node of the interlocutor's talk.
+///
+/// Holds a String which can be converted to a `Rc<RefCell<DialogNode>>`
+/// by `print_file()`
+#[derive(
+    Deref, DerefMut, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default, Component,
+)]
+pub struct Dialog {
+    current_node: Option<String>,
+}
+
+impl Dialog {
+    /// Constructs a new Dialog from the given `str`
+    ///
+    /// # Node
+    ///
+    /// TODO: feature - Read at dialog_file
+    pub fn from_str(str: &str) -> Dialog {
+        Dialog {
+            current_node: Some(str.to_string()),
+        }
+    }
+
+    /// Constructs an empty Dialog `None`
+    pub fn new() -> Dialog {
+        Dialog::default()
+    }
+
+    /// Returns the read-only current node (an `&Option<String>`)
+    pub fn current_node(&self) -> &Option<String> {
+        &self.current_node
+    }
+
+    /// Returns the mutable reference current node (an `&Option<String>`)
+    pub fn current_node_mut(&mut self) -> &mut Option<String> {
+        &mut self.current_node
+    }
+}
+
+/// Hold the list of `WorldEvent`, `TriggerEvent` and the karma min/max
+#[derive(Deref, DerefMut, Resource)]
+pub struct OurInfos(DialogCustomInfos);
 
 fn main() {
     // // When building for WASM, print panics to the browser console
@@ -44,7 +155,18 @@ fn main() {
                 .set(ImagePlugin::default_nearest()),
         )
         .add_plugin(TweeningPlugin)
-        // .add_plugin(DebugPlugin)
+        /* -------------------------------------------------------------------------- */
+        /*                                  Our Code                                  */
+        /* -------------------------------------------------------------------------- */
+        .insert_resource(OurInfos(DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        )))
         .add_plugin(UiPlugin)
         .add_startup_systems((spawn_camera, spawn_player));
 
@@ -276,7 +398,7 @@ mod dialog_panel {
     use bevy_tweening::{lens::UiPositionLens, *};
     use std::time::Duration;
 
-    use fto_dialog::{init_tree_file, Dialog, DialogContent};
+    use fto_dialog::{init_tree_file, DialogContent};
 
     use crate::{
         dialog_scroll::{
@@ -285,7 +407,7 @@ mod dialog_panel {
         constants::ui::dialogs::{
             DIALOG_PANEL_ANIMATION_TIME_MS, DIALOG_PANEL_ANIMATION_OFFSET, SCROLL_ANIMATION_DELTA_S, NORMAL_BUTTON, SCROLL_ANIMATION_FRAMES_NUMBER
         },
-        Karma, Player, NPC,
+        Karma, Player, NPC, Dialog, OurInfos,
     };
 
     /// Represents The UI Wall.
@@ -973,6 +1095,7 @@ mod dialog_panel {
     ///     TODO: feature - NPC Choice
     ///     for now, the player has to choose what the npc should say..
     pub fn update_dialog_panel(
+        our_infos: Res<OurInfos>,
         panel_query: Query<
             (Entity, &DialogPanel),
             // REFACTOR: Handle the interlocutor change in the UIPanel
@@ -1006,7 +1129,7 @@ mod dialog_panel {
                 // info!("DEBUG Empty Dialog Tree");
                 end_node_dialog_event.send(EndNodeDialogEvent);
             } else {
-                let dialog_tree = init_tree_file(dialog_panel.to_owned());
+                let dialog_tree = init_tree_file(dialog_panel.to_owned(), our_infos.clone());
 
                 let current = &dialog_tree.borrow();
 
@@ -1174,7 +1297,7 @@ mod dialog_player {
     use crate::{
         dialog_panel::DialogPanel,
         dialog_scroll::{PlayerChoice, PlayerScroll, Scroll, UpdateScrollEvent, UpperScroll},
-        constants::ui::dialogs::{PRESSED_BUTTON, HOVERED_BUTTON, NORMAL_BUTTON}
+        constants::ui::dialogs::{PRESSED_BUTTON, HOVERED_BUTTON, NORMAL_BUTTON}, OurInfos
     };
 
     /// Happens when
@@ -1295,6 +1418,8 @@ mod dialog_player {
     /// DOC: Noisy comments
     /// FIXME: Quit dialog issue
     pub fn dialog_dive(
+        our_infos: Res<OurInfos>,
+        
         mut dialog_dive_event: EventReader<DialogDiveEvent>,
 
         mut panel_query: Query<&mut DialogPanel, With<Animator<Style>>>,
@@ -1319,7 +1444,7 @@ mod dialog_player {
                 panel.dialog_tree.clear();
                 warn!("DEBUG:force clear dialog panel");
             } else {
-                let dialog_tree = init_tree_file(dialog_panel.to_owned());
+                let dialog_tree = init_tree_file(dialog_panel.to_owned(), our_infos.clone());
                 let upper_scroll = upper_scroll_query.single();
 
                 // option 1: if it is the very last text of the dialog
@@ -1650,6 +1775,9 @@ mod constants {
     pub const RESOLUTION: f32 = 16. / 9.;
 
     pub mod character {
+        pub const KARMA_MAX: i32 = 100;
+        pub const KARMA_MIN: i32 = -KARMA_MAX;
+
         pub mod dialog {
             // Flibittygibbit
 

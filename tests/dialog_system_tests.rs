@@ -1,12 +1,79 @@
 #[cfg(test)]
-// extern crate constants;
-// extern crate ui;
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, fmt, rc::Rc, str::FromStr};
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 use fto_dialog::*;
 
 const KARMA_MAX: i32 = 100;
 const KARMA_MIN: i32 = -KARMA_MAX;
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, EnumIter)]
+enum WorldEvent {
+    BeatTheGame,
+    FirstKill,
+    AreaCleared,
+    HasCharisma,
+    HasFriend,
+    TalkWith1000Frog,
+}
+
+impl fmt::Display for WorldEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            WorldEvent::BeatTheGame => write!(f, "BeatTheGame"),
+            WorldEvent::FirstKill => write!(f, "FirstKill"),
+            WorldEvent::AreaCleared => write!(f, "AreaCleared"),
+            WorldEvent::HasCharisma => write!(f, "HasCharisma"),
+            WorldEvent::HasFriend => write!(f, "HasFriend"),
+            WorldEvent::TalkWith1000Frog => write!(f, "TalkWith1000Frog"),
+        }
+    }
+}
+
+impl FromStr for WorldEvent {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<WorldEvent, Self::Err> {
+        match input {
+            "BeatTheGame" => Ok(WorldEvent::BeatTheGame),
+            "FirstKill" => Ok(WorldEvent::FirstKill),
+            "AreaCleared" => Ok(WorldEvent::AreaCleared),
+            "HasCharisma" => Ok(WorldEvent::HasCharisma),
+            "HasFriend" => Ok(WorldEvent::HasFriend),
+            "TalkWith1000Frog" => Ok(WorldEvent::TalkWith1000Frog),
+            _ => Err(()),
+        }
+    }
+}
+
+/// List all triggerable event,
+/// that can be send when quitting a dialog node
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, EnumIter)]
+enum TriggerEvent {
+    FightEvent,
+    HasFriend,
+}
+impl fmt::Display for TriggerEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TriggerEvent::FightEvent => write!(f, "FightEvent"),
+            TriggerEvent::HasFriend => write!(f, "HasFriend"),
+        }
+    }
+}
+
+impl FromStr for TriggerEvent {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<TriggerEvent, Self::Err> {
+        match input {
+            "FightEvent" => Ok(TriggerEvent::FightEvent),
+            "HasFriend" => Ok(TriggerEvent::HasFriend),
+            _ => Err(()),
+        }
+    }
+}
 
 #[test]
 fn test_print_from_file() {
@@ -91,9 +158,18 @@ fn test_print_from_file() {
 
 #[test]
 fn test_print_from_file_monologue() {
-    let root = init_tree_file(String::from(
-        "# Olf\n\n- Hello\n- Did you just\n- Call me ?\n- Or was it my imagination\n",
-    ));
+    let root = init_tree_file(
+        String::from("# Olf\n\n- Hello\n- Did you just\n- Call me ?\n- Or was it my imagination\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(
         root.borrow().print_file(),
@@ -102,8 +178,61 @@ fn test_print_from_file_monologue() {
 }
 
 #[test]
+fn test_print_from_file_trigger_event_1() {
+    let root = init_tree_file(
+        String::from("# Olf\n\n- Hello\n- Did you just\n- Call me ?\n- Or was it my imagination\n\n-> HasFriend\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
+
+    assert_eq!(
+        root.borrow().print_file(),
+        "# Olf\n\n- Hello\n- Did you just\n- Call me ?\n- Or was it my imagination\n\n-> HasFriend\n".to_string()
+    );
+}
+
+#[test]
+fn test_print_from_file_trigger_event_2() {
+    let root = init_tree_file(
+        String::from("# Olf\n\n- Hello\n\n-> HasFriend, FightEvent\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
+
+    assert_eq!(
+        root.borrow().print_file(),
+        "# Olf\n\n- Hello\n\n-> HasFriend, FightEvent\n".to_string()
+    );
+}
+
+#[test]
 fn test_init_tree_from_file_simple_text_1() {
-    let root = init_tree_file(String::from("# Olf\n\n- Hello\n"));
+    let root = init_tree_file(
+        String::from("# Olf\n\n- Hello\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Olf")));
 
@@ -115,7 +244,18 @@ fn test_init_tree_from_file_simple_text_1() {
 
 #[test]
 fn test_init_tree_from_file_space_overdose_1() {
-    let root = init_tree_file(String::from("#            Olf\n\n-      Hello\n"));
+    let root = init_tree_file(
+        String::from("#            Olf\n\n-      Hello\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Olf")));
 
@@ -127,9 +267,18 @@ fn test_init_tree_from_file_space_overdose_1() {
 
 #[test]
 fn test_init_tree_from_file_space_overdose_2() {
-    let root = init_tree_file(String::from(
-        "# Morgan\n\n- Hello         |   None\n- No Hello    | None\n",
-    ));
+    let root = init_tree_file(
+        String::from("# Morgan\n\n- Hello         |   None\n- No Hello    | None\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
@@ -150,7 +299,18 @@ fn test_init_tree_from_file_space_overdose_2() {
 
 #[test]
 fn test_init_tree_from_file_space_deficiency_1() {
-    let root = init_tree_file(String::from("#Olf\n\n-Hello\n"));
+    let root = init_tree_file(
+        String::from("#Olf\n\n-Hello\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Olf")));
 
@@ -162,7 +322,18 @@ fn test_init_tree_from_file_space_deficiency_1() {
 
 #[test]
 fn test_init_tree_from_file_space_deficiency_2() {
-    let root = init_tree_file(String::from("# Morgan\n\n- Hello|None\n- No Hello|None\n"));
+    let root = init_tree_file(
+        String::from("# Morgan\n\n- Hello|None\n- No Hello|None\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
@@ -183,9 +354,18 @@ fn test_init_tree_from_file_space_deficiency_2() {
 
 #[test]
 fn test_init_tree_from_file_monologue_1() {
-    let root = init_tree_file(String::from(
-        "# Morgan\n\n- Hello\n- I was wondering\n-Alone...\n",
-    ));
+    let root = init_tree_file(
+        String::from("# Morgan\n\n- Hello\n- I was wondering\n-Alone...\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
@@ -201,9 +381,18 @@ fn test_init_tree_from_file_monologue_1() {
 
 #[test]
 fn test_init_tree_from_file_simple_choice_1() {
-    let root = init_tree_file(String::from(
-        "# Morgan\n\n- Hello | None\n- No Hello | None\n",
-    ));
+    let root = init_tree_file(
+        String::from("# Morgan\n\n- Hello | None\n- No Hello | None\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
@@ -224,9 +413,18 @@ fn test_init_tree_from_file_simple_choice_1() {
 
 #[test]
 fn test_init_tree_from_file_complex_choice_1() {
-    let root = init_tree_file(String::from(
-        "# Morgan\n\n- Hello | None\n- No Hello | k: -10,0;\n",
-    ));
+    let root = init_tree_file(
+        String::from("# Morgan\n\n- Hello | None\n- No Hello | k: -10,0;\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
@@ -247,9 +445,18 @@ fn test_init_tree_from_file_complex_choice_1() {
 
 #[test]
 fn test_init_tree_from_file_complex_choice_2() {
-    let root = init_tree_file(String::from(
-        "# Morgan\n\n- Hello | None\n- Mary me Hugo. | e: HasCharisma;\n",
-    ));
+    let root = init_tree_file(
+        String::from("# Morgan\n\n- Hello | None\n- Mary me Hugo. | e: HasCharisma;\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
@@ -264,7 +471,7 @@ fn test_init_tree_from_file_complex_choice_2() {
                 text: "Mary me Hugo.".to_string(),
                 condition: Some(DialogCondition::new(
                     None,
-                    Some(vec![GameEvent::HasCharisma])
+                    Some(vec![WorldEvent::HasCharisma.to_string()])
                 ))
             }
         ]
@@ -276,9 +483,18 @@ fn test_init_tree_from_file_complex_choice_2() {
 
 #[test]
 fn test_init_tree_from_file_complex_choice_3() {
-    let root = init_tree_file(String::from(
-        "# Morgan\n\n- Hello | k: -50,100;\n- No Hello | karma : -100,0;\n",
-    ));
+    let root = init_tree_file(
+        String::from("# Morgan\n\n- Hello | k: -50,100;\n- No Hello | karma : -100,0;\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
@@ -301,7 +517,15 @@ fn test_init_tree_from_file_complex_choice_3() {
 fn test_init_tree_from_file_complex_choice_4() {
     let root = init_tree_file(String::from(
                 "# Morgan\n\n- Hello my Friend | e: HasFriend;\n- You droped this (*crown*) | event: HasCharisma;\n",
-            ));
+            ), DialogCustomInfos::new(
+                WorldEvent::iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>(),
+                Some((KARMA_MIN, KARMA_MAX)),
+                TriggerEvent::iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>(),
+    ));
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
@@ -310,26 +534,74 @@ fn test_init_tree_from_file_complex_choice_4() {
         vec![
             DialogContent::Choice {
                 text: "Hello my Friend".to_string(),
-                condition: Some(DialogCondition::new(None, Some(vec![GameEvent::HasFriend])))
+                condition: Some(DialogCondition::new(
+                    None,
+                    Some(vec![WorldEvent::HasFriend.to_string()])
+                ))
             },
             DialogContent::Choice {
                 text: "You droped this (*crown*)".to_string(),
                 condition: Some(DialogCondition::new(
                     None,
-                    Some(vec![GameEvent::HasCharisma])
+                    Some(vec![WorldEvent::HasCharisma.to_string()])
                 ))
             }
         ]
     );
 }
 
-// allow to type MAX or MIN to select
+/// Verify the case of a event has a k in its name work.
+/// Used to trigger the phase transi into the the karma_phase
+#[test]
+fn test_init_tree_from_file_complex_choice_event_with_k() {
+    let root = init_tree_file(
+        String::from("# Morgan\n\n- KeroKero | e: TalkWith1000Frog;\n- Hello | None;\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
+    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+
+    assert_eq!(
+        root.borrow().dialog_content,
+        vec![
+            DialogContent::Choice {
+                text: "KeroKero".to_string(),
+                condition: Some(DialogCondition::new(
+                    None,
+                    Some(vec!["TalkWith1000Frog".to_string()])
+                ))
+            },
+            DialogContent::Choice {
+                text: "Hello".to_string(),
+                condition: None
+            }
+        ]
+    );
+}
+
+/// allow to type MAX or MIN to select
 #[test]
 fn test_init_tree_from_file_complex_choice_karma_max_min() {
-    let root = init_tree_file(String::from(
-        "# Morgan\n\n- Hello | k: -10,MAX;\n- No Hello | k: MIN,0;\n",
-    ));
+    let root = init_tree_file(
+        String::from("# Morgan\n\n- Hello | k: -10,MAX;\n- No Hello | k: MIN,0;\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
@@ -350,9 +622,18 @@ fn test_init_tree_from_file_complex_choice_karma_max_min() {
 
 #[test]
 fn test_init_tree_from_file_simple_kinship_1() {
-    let root = init_tree_file(String::from(
-        "# Morgan\n\n- Hello\n## Hugo\n- Hey! How are you ?\n",
-    ));
+    let root = init_tree_file(
+        String::from("# Morgan\n\n- Hello\n## Hugo\n- Hey! How are you ?\n"),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
     assert_eq!(
@@ -372,7 +653,15 @@ fn test_init_tree_from_file_simple_kinship_1() {
 
 #[test]
 fn test_init_tree_from_file_monologue_2() {
-    let root = init_tree_file(String::from("# Morgan\n\n- Hello\n- I was wondering\n\n## Morgan\n\n- With Friends ! | event: HasFriend;\n- Alone... | None\n"));
+    let root = init_tree_file(String::from("# Morgan\n\n- Hello\n- I was wondering\n\n## Morgan\n\n- With Friends ! | event: HasFriend;\n- Alone... | None\n"), DialogCustomInfos::new(
+    WorldEvent::iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>(),
+    Some((KARMA_MIN, KARMA_MAX)),
+    TriggerEvent::iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>(),
+));
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
@@ -394,7 +683,10 @@ fn test_init_tree_from_file_monologue_2() {
         vec![
             DialogContent::Choice {
                 text: "With Friends !".to_string(),
-                condition: Some(DialogCondition::new(None, Some(vec![GameEvent::HasFriend])))
+                condition: Some(DialogCondition::new(
+                    None,
+                    Some(vec![WorldEvent::HasFriend.to_string()])
+                ))
             },
             DialogContent::Choice {
                 text: "Alone...".to_string(),
@@ -408,7 +700,15 @@ fn test_init_tree_from_file_monologue_2() {
 fn test_init_tree_from_file_complex_kinship_1() {
     let root = init_tree_file(String::from(
                 "# Morgan\n\n- Hello | None\n- Do you want to work with me ? | None\n\n## Hugo\n\n- Hey! How are you ?\n\n## Hugo\n\n- I'm sure you'll do just fine without me.\n",
-            ));
+            ), DialogCustomInfos::new(
+    WorldEvent::iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>(),
+    Some((KARMA_MIN, KARMA_MAX)),
+    TriggerEvent::iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>(),
+));
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
     assert_eq!(
@@ -425,7 +725,7 @@ fn test_init_tree_from_file_complex_kinship_1() {
         ]
     );
 
-    println!("{}", root.borrow().print_file());
+    // println!("{}", root.borrow().print_file());
 
     // By choosing the n-eme choice, you will get the result of the n-eme child.
 
@@ -456,7 +756,16 @@ fn test_init_tree_from_file_complex_kinship_1() {
 fn test_init_tree_from_file_throwable_event_1() {
     let root = init_tree_file(String::from(
                 "# Morgan\n\n- Let's Talk | None\n- Let's Fight | None\n\n## Hugo\n\n- :)\n\n-> HasFriend\n\n## Hugo\n\n- :(\n\n-> FightEvent\n",
-            ));
+            ), DialogCustomInfos::new(
+                WorldEvent::iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>(),
+                Some((KARMA_MIN, KARMA_MAX)),
+                TriggerEvent::iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>(),
+            )
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
     assert_eq!(
@@ -473,7 +782,7 @@ fn test_init_tree_from_file_throwable_event_1() {
         ]
     );
 
-    println!("{}", root.borrow().print_file());
+    // println!("{}", root.borrow().print_file());
 
     // By choosing the n-eme choice, you will get the result of the n-eme child.
 
@@ -488,7 +797,7 @@ fn test_init_tree_from_file_throwable_event_1() {
     );
     assert_eq!(
         root.borrow().children[0].borrow().trigger_event,
-        vec![ThrowableEvent::HasFriend]
+        vec![TriggerEvent::HasFriend.to_string()]
     );
 
     // second child
@@ -502,15 +811,26 @@ fn test_init_tree_from_file_throwable_event_1() {
     );
     assert_eq!(
         root.borrow().children[1].borrow().trigger_event,
-        vec![ThrowableEvent::FightEvent]
+        vec![TriggerEvent::FightEvent.to_string()]
     );
 }
 
 #[test]
 fn test_init_tree_from_file_except_1() {
-    let root = init_tree_file(String::from(
-        "# Morgan\n\n- Bonjour Florian. /\nComment vas/-tu :/# ? /\nJ'ai faim. /<3 /</|3\n",
-    ));
+    let root = init_tree_file(
+        String::from(
+            "# Morgan\n\n- Bonjour Florian. /\nComment vas/-tu :/# ? /\nJ'ai faim. /<3 /</|3\n",
+        ),
+        DialogCustomInfos::new(
+            WorldEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            Some((KARMA_MIN, KARMA_MAX)),
+            TriggerEvent::iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+        ),
+    );
 
     assert_eq!(root.borrow().author, Some(String::from("Morgan")));
 
