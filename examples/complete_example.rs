@@ -12,7 +12,7 @@ use bevy::{
     window::WindowResolution,
     winit::WinitSettings,
 };
-use rand::Rng;
+use rand::seq::SliceRandom;
 use std::fmt;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -35,6 +35,30 @@ const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
 #[derive(Debug, Reflect, Deref, DerefMut, Clone, Default, Resource)]
 struct CurrentInterlocutor {
     interlocutor: Option<Entity>,
+}
+
+/// Points to the current entity, if they exist, who we're talking with.
+/// Query this entity to get the current Dialog.
+#[derive(Debug, Deref, DerefMut, Clone, Default, Resource)]
+struct ActiveWorldEvents {
+    active_world_events: Vec<WorldEvent>,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, EnumIter)]
+enum WorldEvent {
+    FrogLove,
+    FrogHate,
+    FrogTalk,
+}
+
+impl fmt::Display for WorldEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            WorldEvent::FrogLove => write!(f, "FrogLove"),
+            WorldEvent::FrogHate => write!(f, "FrogHate"),
+            WorldEvent::FrogTalk => write!(f, "FrogTalk"),
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default, Component)]
@@ -83,23 +107,6 @@ struct PlayerPanel;
 #[derive(Component)]
 struct NPCPanel;
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, EnumIter)]
-enum WorldEvent {
-    FrogLove,
-    FrogHate,
-    FrogTalk,
-}
-
-impl fmt::Display for WorldEvent {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            WorldEvent::FrogLove => write!(f, "FrogLove"),
-            WorldEvent::FrogHate => write!(f, "FrogHate"),
-            WorldEvent::FrogTalk => write!(f, "FrogTalk"),
-        }
-    }
-}
-
 // TODO: Visual - DialogPanel Seperator + background
 
 fn main() {
@@ -123,6 +130,7 @@ fn main() {
                 .set(ImagePlugin::default_nearest()),
         )
         .insert_resource(CurrentInterlocutor::default())
+        .insert_resource(ActiveWorldEvents::default())
         .add_event::<DialogDiveEvent>()
         .add_startup_systems((setup, spawn_camera))
         .add_systems((
@@ -250,28 +258,30 @@ fn dialog_dive(
 
                         let mut current_node = dialog_tree.borrow_mut();
 
-                        match current_node.dialog_content.split_first() {
+                        // mut?
+                        match current_node.content().split_first() {
                             None => {}
                             Some((first, rem)) => {
                                 match first {
                                     DialogContent::Text(_) => {
-                                        dialog.current_node =
-                                            if current_node.dialog_content.len() > 1 {
-                                                // The monologue is not finished
-                                                current_node.dialog_content = rem.to_vec();
-                                                Some(current_node.print_file())
-                                            } else if current_node.is_end_node() {
-                                                info!("clear dialog panel");
-                                                None
-                                            } else {
-                                                // TODO: if verify and there is not one choice verified: don't overwrite the current_node to let the last npc sentence
-                                                // DOC: Specifics Rules link - Children (Text/Choice)
-                                                Some(
-                                                    current_node.children[*child_index]
-                                                        .borrow()
-                                                        .print_file(),
-                                                )
-                                            };
+                                        dialog.current_node = if current_node.content().len() > 1 {
+                                            // The monologue is not finished
+                                            *current_node.content_mut() = rem.to_vec();
+                                            Some(current_node.print_file())
+                                        } else if current_node.is_end_node() {
+                                            info!("clear dialog panel");
+                                            // TODO: Trigger Event
+                                            None
+                                        } else {
+                                            // TODO: if verifying: feat TriggerEvent
+                                            // TODO: if verify and there is not one choice verified: don't overwrite the current_node to let the last npc sentence
+                                            // DOC: Specifics Rules link - Children (Text/Choice)
+                                            Some(
+                                                current_node.children()[*child_index]
+                                                    .borrow()
+                                                    .print_file(),
+                                            )
+                                        };
                                     }
                                     DialogContent::Choice {
                                         text: _,
@@ -286,7 +296,7 @@ fn dialog_dive(
                                         } else {
                                             // DOC: Specifics Rules link - Children (Text/Choice)
                                             Some(
-                                                current_node.children[*child_index]
+                                                current_node.children()[*child_index]
                                                     .borrow()
                                                     .print_file(),
                                             )
@@ -322,6 +332,7 @@ fn dialog_dive(
 ///     for now, the player has to choose what the npc should say..
 fn update_dialog_panel(
     current_interlocutor: Res<CurrentInterlocutor>,
+    active_world_events: Res<ActiveWorldEvents>,
     dialog_changed_query: Query<Entity, Changed<Dialog>>,
     dialog_query: Query<&Dialog, With<Portrait>>,
 
@@ -366,13 +377,13 @@ fn update_dialog_panel(
                 );
 
                 let current_node = dialog_tree.borrow();
-                let dialogs = &current_node.dialog_content;
+                let dialogs = &current_node.content();
 
                 match &dialogs.first() {
                     // REFACTOR: Stop panic
                     None => panic!("Err: dialog_content is empty"),
                     Some(DialogContent::Text(text)) => {
-                        if current_node.author().unwrap() == "Player" {
+                        if current_node.author().clone().unwrap() == "Player" {
                             player_text.sections[0].value = text.clone();
                         } else {
                             // replace the entire npc panel's content
@@ -388,17 +399,31 @@ fn update_dialog_panel(
                         text: _,
                         condition: _,
                     }) => {
-                        if current_node.author().unwrap() == "Player" {
+                        if current_node.author().clone().unwrap() == "Player" {
                             // replace current by the new set of choices
                             let mut choices = Vec::<String>::new();
                             for dialog in dialogs.iter() {
                                 match dialog {
-                                    DialogContent::Choice { text, condition: _ } => {
-                                        // TODO: IMPORTANT - Verify condition !
-                                        // TODO: if verify: TriggerEvent
-                                        // TODO: if verify and there is not one choice verified: don't overwrite the current_node to let the last npc sentence (`dialog_dive`)
-                                        choices.push(text.to_owned());
-                                        // info!("DEBUG: add choice: {}", text);
+                                    DialogContent::Choice { text, condition } => {
+                                        match condition {
+                                            Some(cond) => {
+                                                if cond.is_verified(
+                                                    None,
+                                                    Some(active_world_events.active_world_events
+                                                        .iter()
+                                                        .map(|x| x.to_string())
+                                                        .collect::<Vec<String>>())
+                                                ) {
+                                                    choices.push(text.to_owned());
+                                                    // info!("DEBUG: add choice: {}", text);
+                                                }
+                                            }
+                                            // no condition
+                                            None => {
+                                                choices.push(text.to_owned());
+                                                // info!("DEBUG: add choice: {}", text);
+                                            }
+                                        }
                                     }
                                     _ => panic!(
                                         "Err: DialogTree Incorrect; A choices' vector contains something else"
@@ -426,12 +451,44 @@ fn update_dialog_panel(
                                 npc_text.sections[0].value.clear();
                             }
                         } else {
-                            // TODO: IMPORTANT - Verify condition !
-                            let child_index = rand::thread_rng().gen_range(0..dialogs.len());
-                            dialog_dive_event.send(DialogDiveEvent {
-                                child_index,
-                                skip: false,
-                            });
+                            // NPC Choices
+                            let mut possible_choices_index: Vec<usize> = Vec::new();
+                            for (index, dialog) in dialogs.iter().enumerate() {
+                                match dialog {
+                                    DialogContent::Choice { text: _, condition } => {
+                                        match condition {
+                                            Some(cond) => {
+                                                if cond.is_verified(
+                                                    None,
+                                                    Some(active_world_events.active_world_events
+                                                        .iter()
+                                                        .map(|x| x.to_string())
+                                                        .collect::<Vec<String>>())
+                                                ) {
+                                                    possible_choices_index.push(index);
+                                                }
+                                            }
+                                            // no condition
+                                            None => {
+                                                possible_choices_index.push(index);
+                                            }
+                                        }
+                                    }
+                                    _ => panic!(
+                                        "Err: DialogTree Incorrect; A choices' vector contains something else"
+                                    ),
+                                }
+                            }
+                            if let Some(child_index) =
+                                possible_choices_index.choose(&mut rand::thread_rng())
+                            {
+                                dialog_dive_event.send(DialogDiveEvent {
+                                    child_index: *child_index,
+                                    skip: false,
+                                });
+                            } else {
+                                // TODO: if `possible_choices_index.is_empty()`
+                            }
                         }
                     }
                 }

@@ -1133,7 +1133,7 @@ mod dialog_panel {
 
                 let current = &dialog_tree.borrow();
 
-                let dialogs = &current.dialog_content;
+                let dialogs = &current.content();
 
                 let (mut player_scroll, _player_scroll_entity) = player_scroll_query.single_mut();
 
@@ -1175,7 +1175,7 @@ mod dialog_panel {
                                 match condition {
                                     Some(cond) => {
                                         let (_player, karma) = player_query.single();
-                                        if cond.is_verified(karma.0) {
+                                        if cond.is_verified(Some(karma.0), None) {
                                             choices.push(text.to_owned());
                                             info!("DEBUG: add choice: {}", text);
                                         }
@@ -1480,7 +1480,7 @@ mod dialog_player {
                         // **the rule implied not**
                         // cause a text must have one child or none
 
-                        let child = dialog_tree.borrow().children[*child_index]
+                        let child = dialog_tree.borrow().children()[*child_index]
                             .borrow()
                             .print_file();
 
