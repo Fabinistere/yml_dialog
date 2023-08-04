@@ -1,13 +1,9 @@
 //! Complete Example of a three Dialog.
 //!
-//! The NPC choice AI is not implemented.
-//!
 //! - Press any key to continue the dialog.
 //! - Choose your answer with the down right buttons.
 //! - You can press the reset button to ... to reset.
 //! - Click on one of the three frog portrait above.
-
-use std::fmt;
 
 use bevy::{
     input::{keyboard::KeyboardInput, ButtonState},
@@ -16,9 +12,12 @@ use bevy::{
     window::WindowResolution,
     winit::WinitSettings,
 };
-use fto_dialog::{init_tree_file, DialogContent, DialogCustomInfos};
+use rand::Rng;
+use std::fmt;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
+
+use fto_dialog::{init_tree_file, DialogContent, DialogCustomInfos};
 
 // dark purple #25131a = 39/255, 19/255, 26/255
 const CLEAR: bevy::render::color::Color = bevy::render::color::Color::rgb(0.153, 0.07, 0.102);
@@ -330,6 +329,8 @@ fn update_dialog_panel(
     mut player_panel_query: Query<&mut Text, (With<PlayerPanel>, Without<NPCPanel>)>,
     mut player_choices_query: Query<(&Choice, &mut Visibility, &Children)>,
     mut text_query: Query<&mut Text, (Without<PlayerPanel>, Without<NPCPanel>)>,
+
+    mut dialog_dive_event: EventWriter<DialogDiveEvent>,
 ) {
     if !current_interlocutor.is_none()
         && (current_interlocutor.is_changed() || !dialog_changed_query.is_empty())
@@ -350,9 +351,9 @@ fn update_dialog_panel(
                     *visibility = Visibility::Hidden;
                 }
             }
-            Some(current_node) => {
+            Some(current) => {
                 let dialog_tree = init_tree_file(
-                    current_node.to_owned(),
+                    current.to_owned(),
                     DialogCustomInfos::new(
                         WorldEvent::iter()
                             .map(|x| x.to_string())
@@ -364,14 +365,14 @@ fn update_dialog_panel(
                     ),
                 );
 
-                let current = dialog_tree.borrow();
-                let dialogs = &current.dialog_content;
+                let current_node = dialog_tree.borrow();
+                let dialogs = &current_node.dialog_content;
 
                 match &dialogs.first() {
                     // REFACTOR: Stop panic
                     None => panic!("Err: dialog_content is empty"),
                     Some(DialogContent::Text(text)) => {
-                        if current.author().unwrap() == "Player" {
+                        if current_node.author().unwrap() == "Player" {
                             player_text.sections[0].value = text.clone();
                         } else {
                             // replace the entire npc panel's content
@@ -383,18 +384,16 @@ fn update_dialog_panel(
                             }
                         }
                     }
-                    // REFACTOR: In this example, NPC can't have choice :0
-                    // the middle frog could have a random choice for the catchphrase
                     Some(DialogContent::Choice {
                         text: _,
                         condition: _,
                     }) => {
-                        // replace current by the new set of choices
-                        let mut choices = Vec::<String>::new();
-                        for dialog in dialogs.iter() {
-                            // if dialog_tree.borrow().author().unwrap() == "Player" {}
-                            match dialog {
-                                DialogContent::Choice { text, condition: _ } => {
+                        if current_node.author().unwrap() == "Player" {
+                            // replace current by the new set of choices
+                            let mut choices = Vec::<String>::new();
+                            for dialog in dialogs.iter() {
+                                match dialog {
+                                    DialogContent::Choice { text, condition: _ } => {
                                         // TODO: IMPORTANT - Verify condition !
                                         // TODO: if verify: TriggerEvent
                                         // TODO: if verify and there is not one choice verified: don't overwrite the current_node to let the last npc sentence (`dialog_dive`)
@@ -405,22 +404,34 @@ fn update_dialog_panel(
                                         "Err: DialogTree Incorrect; A choices' vector contains something else"
                                     ),
                                 }
-                        }
-                        player_text.sections[0].value.clear();
-
-                        for (choice_index, mut visibility, children) in &mut player_choices_query {
-                            if choice_index.0 < choices.len() {
-                                let mut text = text_query.get_mut(children[0]).unwrap();
-                                text.sections[0].value = choices[choice_index.0].clone();
-                                *visibility = Visibility::Inherited;
-                            } else {
-                                *visibility = Visibility::Hidden;
                             }
-                        }
+                            player_text.sections[0].value.clear();
 
-                        // Remove all text which aren't said by the current interlocutor
-                        if current_interlocutor.is_changed() {
-                            npc_text.sections[0].value.clear();
+                            for (choice_index, mut visibility, children) in
+                                &mut player_choices_query
+                            {
+                                // Here you could compare the index with `dialogs.len()` to incorpore all choice but
+                                // lock the unsatisfied choice's condition
+                                if choice_index.0 < choices.len() {
+                                    let mut text = text_query.get_mut(children[0]).unwrap();
+                                    text.sections[0].value = choices[choice_index.0].clone();
+                                    *visibility = Visibility::Inherited;
+                                } else {
+                                    *visibility = Visibility::Hidden;
+                                }
+                            }
+
+                            // Remove all text which aren't said by the current interlocutor
+                            if current_interlocutor.is_changed() {
+                                npc_text.sections[0].value.clear();
+                            }
+                        } else {
+                            // TODO: IMPORTANT - Verify condition !
+                            let child_index = rand::thread_rng().gen_range(0..dialogs.len());
+                            dialog_dive_event.send(DialogDiveEvent {
+                                child_index,
+                                skip: false,
+                            });
                         }
                     }
                 }
@@ -493,8 +504,7 @@ fn spawn_camera(mut commands: Commands) {
 pub const OLD_FROG_DIALOG: &str = "# Old Frog
 
 - KeroKero
-- I want you to talk with the last Frog
-- All the way.
+- I want you to talk with the last Frog.\\nAll the way.
 
 ## Player
 
@@ -503,31 +513,84 @@ pub const OLD_FROG_DIALOG: &str = "# Old Frog
 ### Old Frog
 
 - You have my respect.
-
-### Old Frog
-
 - Press Reset or alt+f4.\n";
 
 pub const FROG_DIALOG: &str = "# Frog
 
+- KeroKero | None
+- Crôaa | None
+- bêêh | None
+
+## Frog
+
 - KeroKero
 
-## Player
+### Player
 
 - I wanted to say you something
 
-### Player
+#### Player
 
 - You = Cool | None
 - You = Not Cool | None
 
-#### Frog
+##### Frog
 
 - Big love on you
 
 -> FrogLove
 
-#### Frog
+##### Frog
+
+- I'm sad now.
+
+-> FrogHate
+
+## Frog
+
+- Crôaa
+
+### Player
+
+- I wanted to say you something
+
+#### Player
+
+- You = Cool | None
+- You = Not Cool | None
+
+##### Frog
+
+- Big love on you
+
+-> FrogLove
+
+##### Frog
+
+- I'm sad now.
+
+-> FrogHate
+
+## Frog
+
+- Bêêh
+
+### Player
+
+- I wanted to say you something
+
+#### Player
+
+- You = Cool | None
+- You = Not Cool | None
+
+##### Frog
+
+- Big love on you
+
+-> FrogLove
+
+##### Frog
 
 - I'm sad now.
 
