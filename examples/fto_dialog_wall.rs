@@ -1566,15 +1566,15 @@ mod dialog_player {
             // TOTEST: calling this event mean the scroll do exist but maybe not ?
             let (mut upper_scroll, _upper_scroll_entity) = upper_scroll_query.single_mut();
 
-            if let Some((_first, rem)) = upper_scroll.texts.split_first() {
-                // pop first only
-                upper_scroll.texts = rem.to_vec();
+            match upper_scroll.texts.split_first() {
+                None => warn!("The UpperScroll does not contain text"),
+                Some((_first, rem)) => {
+                    // pop first only
+                    upper_scroll.texts = rem.to_vec();
 
-                // ask to update the content of scroll (which will update the DialogBox)
-                scroll_event.send(UpdateScrollEvent);
-            } else {
-                // shouldn't be the case
-                warn!("The UpperScroll does not contain text")
+                    // ask to update the content of scroll (which will update the DialogBox)
+                    scroll_event.send(UpdateScrollEvent);
+                }
             }
         }
     }
