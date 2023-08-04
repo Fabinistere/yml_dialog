@@ -12,87 +12,44 @@
 //!     - Choice based
 //!   - A node can send Specific Event
 //!
-//! Tree structure based on https://applied-math-coding.medium.com/a-tree-structure-implemented-in-rust-8344783abd75
+//! Tree structure based on [`Rc<RefCell<Node>>`](https://applied-math-coding.medium.com/a-tree-structure-implemented-in-rust-8344783abd75)
 #![warn(missing_docs)]
 
-use std::{cell::RefCell, fmt, rc::Rc, str::FromStr};
+use std::{cell::RefCell, rc::Rc};
 
-use bevy::prelude::{warn, Component, Deref, DerefMut};
+use log::warn;
 
-const KARMA_MAX: i32 = 100;
-const KARMA_MIN: i32 = -KARMA_MAX;
+// REFACTOR: Merge WorldEvent and TriggerEvent
 
-/// Contains the current Dialog node of the interlocutor's talk.
-///
-/// Holds a String which can be converted to a Rc<RefCell<DialogNode>>
-/// by `print_file()`
-///
-/// # Example
-///
-/// IDEA: In the example, put the struct into a `commands.spawn((...))` method
-///
-/// ```rust
-/// # main() -> Result<(), std::num::ParseIntError> {
-/// # use fto_dialog::ui::dialog_system::Dialog;
-/// Dialog {
-///     current_node: Some("# Fabien\n\n- Hello\n".to_string())
-/// }
-/// #     Ok(())
-/// # }
-/// ```
-///
-/// # Note
-///
-/// DOC: Struct might be useless
-///
-/// To extend this `Component`, don't import it.... and create your own.
-///
-/// ```rust
-/// # main() -> Result<(), std::num::ParseIntError> {
-/// \#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default, Component)]
-/// struct YourDialog {
-///     root: Option<String>,
-///     current_node: Option<String>,
-/// }
-/// #     Ok(())
-/// # }
-/// ```
-#[derive(Deref, DerefMut, PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default, Component)]
-pub struct Dialog {
-    pub current_node: Option<String>,
-}
-
-impl Dialog {
-    /// TODO: feature - Read at dialog_file
-    pub fn new(str: &str) -> Dialog {
-        Dialog {
-            current_node: Some(str.to_string()),
-        }
-    }
-
-    // fn new_string(string: String) -> Dialog {
-    //     Dialog {
-    //         current_node: Some(string),
-    //     }
-    // }
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum DialogType {
+/// An item from a `DialogNode`
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum DialogContent {
+    /// A line from a `DialogNode`
     Text(String),
+    /// A choice from a `DialogNode`
     Choice {
+        /// Choice's text
         text: String,
+        /// A potential condition which could lock the choice access
         condition: Option<DialogCondition>,
     },
 }
 
-impl DialogType {
-    fn new_text() -> DialogType {
-        DialogType::Text(String::new())
+impl Default for DialogContent {
+    fn default() -> Self {
+        DialogContent::Text(String::new())
+    }
+}
+
+impl DialogContent {
+    /// Construct a new empty Text.
+    pub fn new_text() -> DialogContent {
+        DialogContent::default()
     }
 
-    fn new_choice() -> DialogType {
-        DialogType::Choice {
+    /// Construct a new empty Choice.
+    pub fn new_choice() -> DialogContent {
+        DialogContent::Choice {
             text: String::new(),
             condition: None,
         }
@@ -100,233 +57,157 @@ impl DialogType {
 
     /// Only compare the type,
     /// it don't compare content
-    fn _eq(&self, comp: DialogType) -> bool {
+    pub fn eq(&self, comp: DialogContent) -> bool {
         matches!(
             (self.clone(), comp),
-            (DialogType::Text(_), DialogType::Text(_))
-                | (DialogType::Choice { .. }, DialogType::Choice { .. })
+            (DialogContent::Text(_), DialogContent::Text(_))
+                | (DialogContent::Choice { .. }, DialogContent::Choice { .. })
         )
     }
 
-    fn is_choice(&self) -> bool {
+    /// Returns `true` if this content is a choice.
+    pub fn is_choice(&self) -> bool {
         matches!(
             self.clone(),
-            DialogType::Choice {
+            DialogContent::Choice {
                 text: _text,
                 condition: _cond,
             }
         )
     }
 
-    fn is_text(&self) -> bool {
-        matches!(self.clone(), DialogType::Text(_))
+    /// Returns `true` if this content is a text.
+    pub fn is_text(&self) -> bool {
+        matches!(self.clone(), DialogContent::Text(_))
     }
 }
 
-// TODO: MOVE IT UP
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub enum GameEvent {
-    BeatTheGame,
-    FirstKill,
-    AreaCleared,
-    HasCharisma,
-    HasFriend,
-}
-
-impl fmt::Display for GameEvent {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            GameEvent::BeatTheGame => write!(f, "BeatTheGame"),
-            GameEvent::FirstKill => write!(f, "FirstKill"),
-            GameEvent::AreaCleared => write!(f, "AreaCleared"),
-            GameEvent::HasCharisma => write!(f, "HasCharisma"),
-            GameEvent::HasFriend => write!(f, "HasFriend"),
-        }
-    }
-}
-
-impl FromStr for GameEvent {
-    type Err = (); // ParseIntError;
-
-    fn from_str(input: &str) -> Result<GameEvent, Self::Err> {
-        match input {
-            "BeatTheGame" => Ok(GameEvent::BeatTheGame),
-            "FirstKill" => Ok(GameEvent::FirstKill),
-            "AreaCleared" => Ok(GameEvent::AreaCleared),
-            "HasCharisma" => Ok(GameEvent::HasCharisma),
-            "HasFriend" => Ok(GameEvent::HasFriend),
-            _ => Err(()),
-        }
-    }
-}
-
-/// Happens in
-///   - ui::dialog_player
-///     - dialog_dive
-///     Exit a node
-/// Read in
-///   - ui::dialog_player
-///     - throw_trigger_event
-///     Match the Enum and handle it
-///     REFACTOR: or/and TriggerEvent Handle by sending these real Event
-pub struct TriggerEvent(pub Vec<ThrowableEvent>);
-// pub struct FightEvent;
-
-/// DOC
+/// Choice's Condition
 ///
-/// List all triggerable event,
-/// that can be send when quitting a dialog node
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub enum ThrowableEvent {
-    FightEvent,
-    HasFriend,
-}
-
-impl fmt::Display for ThrowableEvent {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ThrowableEvent::FightEvent => write!(f, "FightEvent"),
-            ThrowableEvent::HasFriend => write!(f, "HasFriend"),
-        }
-    }
-}
-
-impl FromStr for ThrowableEvent {
-    type Err = (); // ParseIntError;
-
-    fn from_str(input: &str) -> Result<ThrowableEvent, Self::Err> {
-        match input {
-            "FightEvent" => Ok(ThrowableEvent::FightEvent),
-            "HasFriend" => Ok(ThrowableEvent::HasFriend),
-            _ => Err(()),
-        }
-    }
-}
-
-/// NOTE: Could be a CUSTOM
-#[derive(PartialEq, Clone, Default, Debug)]
+/// # Note
+///
+/// NOTE: CUSTOM
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub struct DialogCondition {
-    /// `(0,0) = infinite / no threshold`
-    ///
-    /// A dialog choice with a condition karma_threshold at (0,0)
-    /// will always be prompted
     karma_threshold: Option<(i32, i32)>,
-    event: Option<Vec<GameEvent>>,
+    event: Option<Vec<String>>,
 }
 
 impl DialogCondition {
-    pub fn new(
-        karma_threshold: Option<(i32, i32)>,
-        event: Option<Vec<GameEvent>>,
-    ) -> DialogCondition {
+    /// Construct a new DialogCondition with the given `karma_threshold` and `event`.
+    pub fn new(karma_threshold: Option<(i32, i32)>, event: Option<Vec<String>>) -> DialogCondition {
         DialogCondition {
             karma_threshold,
             event,
         }
     }
 
+    /// Only check if the `karma` is within the range of the condition
+    ///
+    /// # Note
+    ///
+    /// TODO: feature - also check if its event has been already triggered in the game
     pub fn is_verified(&self, karma: i32) -> bool {
-        // TODO: feature - also check if its event has been already triggered in the game
-
         match self.karma_threshold {
             None => true,
             Some(karma_threshold) => karma >= karma_threshold.0 && karma <= karma_threshold.1,
         }
     }
 
+    /// Returns the read-only `karma_threshold` item of the `DialogCondition`.
     pub fn karma_threshold(&self) -> &Option<(i32, i32)> {
         &self.karma_threshold
     }
 
+    /// Returns the mutable reference `karma_threshold` item of the `DialogCondition`.
     pub fn karma_threshold_mut(&mut self) -> &mut Option<(i32, i32)> {
         &mut self.karma_threshold
     }
 
-    pub fn event(&self) -> &Option<Vec<GameEvent>> {
+    /// Returns the read-only `event` item of the `DialogCondition`.
+    pub fn event(&self) -> &Option<Vec<String>> {
         &self.event
     }
 
-    pub fn event_mut(&mut self) -> &mut Option<Vec<GameEvent>> {
+    /// Returns the mtable reference `event` item of the `DialogCondition`.
+    pub fn event_mut(&mut self) -> &mut Option<Vec<String>> {
         &mut self.event
     }
 }
 
-/// Points to the first DialogNode
-/// Used to be linked with an entity
-#[derive(PartialEq, Clone, Debug)]
-pub struct DialogTree {
-    pub current: Option<DialogNode>,
-}
-
-#[derive(PartialEq, Clone, Default, Debug)]
+/// A tree node with
+///
+/// - `dialog_content`: a vector of either Text only or Choice only.
+/// - `author`: the potential name of the speaker.
+/// - `children`: its roots.
+/// - `parent`: its origin.
+/// - `trigger_event`: All events triggered by this dialogue.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
 pub struct DialogNode {
-    /// Choice can have multiple children (to give a real impact to the choice)
+    /// A vector of either Text only or Choice only.
     ///
-    /// Every character can have multitude choice
-    ///
-    /// - A Roaster of answer enable for the player
+    /// - A Roaster of answer enable
     ///   - each with certain conditions to be enabled
-    /// - A Roaster of catchphrase for npc
-    ///   - with a priority system to alloy important event
-    ///   to take over the ambiance
-    ///   - it will permit more life and warm content,
-    ///   some not cold npc to grow with the place
-    ///
-    /// # Note
-    ///
-    /// DOC: Rename DialogNode's field: dialog_type
-    pub dialog_type: Vec<DialogType>,
-    /// Actor / Actress
-    ///
-    /// can be an npc OR a player.
-    ///
-    /// The u32 is the id of the entity,
-    /// The String is their name
-    ///
-    /// # Note
-    ///
-    /// REFACTOR: Remove the execution-time known variable id
-    pub author: Option<(u32, String)>,
+    /// - A Roaster of line from a monologue.
+    ///   - TODO: with a priority system to alloy important event
+    pub dialog_content: Vec<DialogContent>,
+    /// The potential name of the speaker.
+    pub author: Option<String>,
+    /// Vector of its subtree.
     pub children: Vec<Rc<RefCell<DialogNode>>>,
+    /// Its potential Parent.
+    ///
+    /// # Note
+    ///
     /// maybe too much (prefer a stack in the TreeIterator)
     pub parent: Option<Rc<RefCell<DialogNode>>>,
-    pub trigger_event: Vec<ThrowableEvent>,
+    /// All events triggered by this dialogue.
+    ///
+    /// # Note
+    ///
+    /// NOTE: CUSTOM (but how...)
+    pub trigger_event: Vec<String>,
 }
 
 impl DialogNode {
     // pub fn is_empty(&self) -> bool {
-    //     self.dialog_type.is_empty()
+    //     self.dialog_content.is_empty()
     // }
 
+    /// # Return
+    ///
+    /// `true` if this node doesn't have any children.
     pub fn is_end_node(&self) -> bool {
         self.children.is_empty()
     }
 
     /// # Return
     ///
-    /// `true` if the type of the first element (of dialog_type) is choice
+    /// `true` if the type of the first element (of dialog_content) is choice
     pub fn is_choice(&self) -> bool {
-        if !self.dialog_type.is_empty() {
-            return self.dialog_type[0].is_choice();
+        if !self.dialog_content.is_empty() {
+            return self.dialog_content[0].is_choice();
         }
         false
     }
 
     /// # Return
     ///
-    /// `true` if the type of the first element (of dialog_type) is choice
+    /// `true` if the type of the first element (of dialog_content) is choice
     pub fn is_text(&self) -> bool {
-        if !self.dialog_type.is_empty() {
-            return self.dialog_type[0].is_text();
+        if !self.dialog_content.is_empty() {
+            return self.dialog_content[0].is_text();
         }
         false
     }
 
+    /// Put `new_node` in the end of the children vector.
     pub fn add_child(&mut self, new_node: Rc<RefCell<DialogNode>>) {
         self.children.push(new_node);
     }
 
-    pub fn author(&self) -> Option<(u32, String)> {
+    /// Give the author of the node.
+    pub fn author(&self) -> Option<String> {
         self.author.clone()
     }
 
@@ -362,8 +243,7 @@ impl DialogNode {
     ///
     /// #### Author 1
     ///
-    /// - This text will be prompted only if the fourth choice is selected by the player
-    ///
+    /// - This text will be prompted only if the fourth choice is selected by the player\n
     /// ```
     pub fn print_file(&self) -> String {
         self.print_file_aux(String::from("#"))
@@ -373,18 +253,18 @@ impl DialogNode {
         let mut res = headers.clone();
 
         let character: String = match &self.author {
-            Some((_id, name)) => " ".to_string() + name,
+            Some(name) => " ".to_string() + name,
 
             None => String::from(" Narator"),
         };
         res.push_str(&character);
         res.push_str("\n\n");
 
-        for dialog in &self.dialog_type {
-            if let DialogType::Text(text) = dialog {
+        for dialog in &self.dialog_content {
+            if let DialogContent::Text(text) = dialog {
                 res.push_str("- ");
                 res.push_str(text);
-            } else if let DialogType::Choice { text, condition } = dialog {
+            } else if let DialogContent::Choice { text, condition } = dialog {
                 res.push_str("- ");
                 res.push_str(text);
                 res.push_str(" | ");
@@ -405,7 +285,7 @@ impl DialogNode {
                                     // DOC: events in plurial ?
                                     res.push_str("event: ");
                                     for event in events {
-                                        res.push_str(&event.to_string());
+                                        res.push_str(event);
                                         res.push(',');
                                     }
                                     res.push(';');
@@ -423,6 +303,20 @@ impl DialogNode {
             }
             res.push('\n');
         }
+
+        if !self.trigger_event.is_empty() {
+            res.push_str("\n->");
+        }
+        for trigger_event in &self.trigger_event {
+            res.push_str(&format!(" {},END", trigger_event));
+        }
+        if !self.trigger_event.is_empty() {
+            res.push('\n');
+
+            res = res.replace(",END ", ", ");
+            res = res.replace(",END\n", "\n");
+        }
+
         res.push_str("\n\nEND");
 
         // event
@@ -442,7 +336,9 @@ impl DialogNode {
         res = res.replace("#\n\n#", "##");
         res = res.replace("\n\n\n", "\n\n");
 
-        // remove the last "\n\n"
+        /* -------------------------------------------------------------------------- */
+        /*                           Remove the last "\n\n"                           */
+        /* -------------------------------------------------------------------------- */
         res = res.replace("END#", "#");
         // keep only one last '\n' (to respect init rules)
         res = res.replace("\n\nEND", "\n");
@@ -451,7 +347,107 @@ impl DialogNode {
     }
 }
 
+/// It's an argument of `init_tree_file`
+/// used to get custom infos from the user.
+///
+/// # Note
+///  
+/// TODO: Create setter (getter is kinda useless cause we're using it here)
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+pub struct DialogCustomInfos {
+    /// Set of event that could be required to
+    /// unlock a Choice, in `DialogCondition`.
+    ///
+    /// # Tips
+    ///
+    /// - You can define an enum with all your `WorldEvent`
+    /// and iter through all of them and "print" them in.
+    ///
+    /// ```rust
+    /// use enum_iter::EnumIter;
+    ///
+    /// /// World event
+    /// #[derive(EnumIter, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+    /// pub enum GameEvent {
+    ///     BeatTheGame,
+    ///     FirstKill,
+    ///     AreaCleared,
+    ///     HasCharisma,
+    ///     HasFriend,
+    /// }
+    ///
+    /// impl fmt::Display for GameEvent {
+    ///     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    ///         match self {
+    ///             GameEvent::BeatTheGame => write!(f, "BeatTheGame"),
+    ///             GameEvent::FirstKill => write!(f, "FirstKill"),
+    ///             GameEvent::AreaCleared => write!(f, "AreaCleared"),
+    ///             GameEvent::HasCharisma => write!(f, "HasCharisma"),
+    ///             GameEvent::HasFriend => write!(f, "HasFriend"),
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// impl FromStr for GameEvent {
+    ///     type Err = ();
+    ///
+    ///     fn from_str(input: &str) -> Result<GameEvent, Self::Err> {
+    ///         match input {
+    ///             "BeatTheGame" => Ok(GameEvent::BeatTheGame),
+    ///             "FirstKill" => Ok(GameEvent::FirstKill),
+    ///             "AreaCleared" => Ok(GameEvent::AreaCleared),
+    ///             "HasCharisma" => Ok(GameEvent::HasCharisma),
+    ///             "HasFriend" => Ok(GameEvent::HasFriend),
+    ///             _ => Err(()),
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// TODO: Iter throw the enum and put it in this field
+    /// let infos = DialogCustomInfos::new(
+    ///     GameEvent::iter()
+    ///         .map(|x| x.to_string())
+    ///         .collect::<Vec<String>>(),
+    ///     Some((-100, 100)),
+    ///     GameEvent::iter()
+    ///         .map(|x| x.to_string())
+    ///         .collect::<Vec<String>>(),
+    /// );
+    /// let s = String::from("# Player\n\n- I beat the game | e: BeatTheGame;\n- There is no hope | None\n");
+    /// let tree = init_tree_file(s, infos);
+    /// ```
+    world_event: Vec<String>,
+    /// Define the (Min, Max) for the KarmaThreshold of `DialogConditon`
+    /// to allow the user to write Max instead of a given number
+    karma_limits: Option<(i32, i32)>,
+    /// Set of event that could be triggered when leaving/entering (your implementation choice)
+    /// a node.
+    trigger_event: Vec<String>,
+}
+
+impl DialogCustomInfos {
+    // /// Constructs a new empty `DialogCustomInfos`
+    // pub fn new() -> Self {
+    //     DialogCustomInfos::default()
+    // }
+
+    /// Constructs a new `DialogCustomInfos` with the given `world_event`, `karma_limits` and `trigger_event`
+    pub fn new(
+        world_event: Vec<String>,
+        karma_limits: Option<(i32, i32)>,
+        trigger_event: Vec<String>,
+    ) -> Self {
+        DialogCustomInfos {
+            world_event,
+            karma_limits,
+            trigger_event,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 enum InitPhase {
+    #[default]
     AuthorPhase,
     ContentPhase,
     ConditionPhase,
@@ -461,10 +457,20 @@ enum InitPhase {
 ///
 /// * `s` - A string that holds a DialogTree
 ///
+/// IDEA: To allow users to choose The max/min of Karma put it in Argument
+///
+/// # Return
+///
+/// the root: `Rc<RefCell<DialogNode>>`
+///
+/// REFACTOR: `Result<Rc<RefCell<DialogNode>>, Self::Err>`
+///
 /// # Panics
 ///
 /// The creation will panic
-/// if any argument to the process is not valid DialogTree format.
+/// if any argument to the process is not valid [DialogTree format].
+///
+/// REFACTOR: Send an error, don't crash
 ///
 /// # Conventions
 ///
@@ -498,11 +504,11 @@ enum InitPhase {
 ///     - event;
 ///     All followed events must be triggered to enable this choice.
 /// - A text can have only one child
-/// - A dialog node cannot have more than one type of dialog_type
+/// - A dialog node cannot have more than one type of dialog_content
 ///   - for example
-///   within a same DialogNode, having a text and a choice in the dialog_type field
+///   within a same DialogNode, having a text and a choice in the dialog_content field
 ///   will break soon or later
-///   FIXME: make it break soon as possible
+///   FIXME: make it break soon as possible - Create Error
 ///
 /// ***The end marker of the dialog is `\n`.***
 /// You **MUST** end this string by a `\n`.
@@ -513,10 +519,10 @@ enum InitPhase {
 ///   - `k: x,y;` instead of `karma: x,y;`
 ///   - `e: Event1, Event2;` instead of `event: Event1, Event2;`
 /// - You can use `MAX`/`MIN` to pick the highest/lowest karma threshold possible
+///   - REFACTOR: use macro by example or put these in the method argument
 /// - Prefere not typing anything if it's something like this: `k: MIN,MAX;`
 /// - No matter in the order: `karma: 50,-50;` will result by `karma_threshold: Some((-50,50))`
-/// - To use '-', '\n', '|', '#' or '>' prefere use the char '/' just before these chars
-/// to prevent unwanted phase transition (from content phase to whatever phase)
+/// - To include these symbols `-`, `\n`, `|`, `#` or `>` put the char `/` just before
 ///
 /// # Examples
 ///
@@ -531,10 +537,11 @@ enum InitPhase {
 ///   - a first simple Text with a second simple Text as child
 ///
 /// ```rust
-/// # // ignore the extra '#' on the example (code block )
-/// # main() -> Result<(), std::num::ParseIntError> {
+/// # use std::{cell::RefCell, rc::Rc};
+/// # use fto_dialog::DialogNode;
+/// use fto_dialog::{init_tree_file, DialogCustomInfos};
 ///
-/// let tree: DialogTree = init_tree_file(
+/// let tree: Rc<RefCell<DialogNode>> = init_tree_file(
 ///     String::from(
 /// "# Morgan
 ///
@@ -554,10 +561,13 @@ enum InitPhase {
 /// - Now you can chill at the hospis
 ///
 /// -> OpenTheHospis\n"
-///     )
+///     ),
+///     DialogCustomInfos::new(
+///         Vec::from([String::from("OlfBeaten")]),
+///         None,
+///         Vec::from([String::from("OpenTheHospis")]),
+///     ),
 /// );
-/// #     Ok(())
-/// # }
 /// ```
 ///
 /// To create a long monologue,
@@ -565,9 +575,11 @@ enum InitPhase {
 /// to seperated paragraph
 ///
 /// ```rust
-/// # main() -> Result<(), std::num::ParseIntError> {
+/// # use std::{cell::RefCell, rc::Rc};
+/// # use fto_dialog::DialogNode;
+/// use fto_dialog::{init_tree_file, DialogCustomInfos};
 ///
-/// let tree: DialogTree = init_tree_file(
+/// let tree: Rc<RefCell<DialogNode>> = init_tree_file(
 ///     String::from(
 /// "# Olf
 ///
@@ -576,38 +588,45 @@ enum InitPhase {
 /// - Or maybe...
 /// - You want to fight me ?
 ///
-/// \## Morgan
+/// ### Morgan
 ///
 /// - Here my money | e: WonTheLottery;
 /// - You will feel my guitar | None
 /// - Call Homie | k: 10,MAX;
 ///
-/// \### Olf
+/// #### Olf
 ///
 /// - Thank you very much
 ///
-/// \### Olf
+/// #### Olf
 ///
 /// - Nice
 /// -> FightEvent
 ///
-/// \### Olf
+/// #### Olf
 ///
 /// - Not Nice
 /// -> FightEvent\n"
-///     )
+///     ),
+///     DialogCustomInfos::new(
+///         Vec::from([String::from("WonTheLottery")]),
+///         Some((0, 100)),
+///         Vec::from([String::from("FightEvent")]),
+///     ),
 /// );
-/// #     Ok(())
-/// # }
 /// ```
-pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
+///
+/// [DialogTree format]: #rules
+pub fn init_tree_file(s: String, infos: DialogCustomInfos) -> Rc<RefCell<DialogNode>> {
+    // Result<Rc<RefCell<DialogNode>>, Box<dyn Error>> {
+    // Result<Rc<RefCell<DialogNode>>, &'static str> {
     let root = Rc::new(RefCell::new(DialogNode::default()));
 
     let mut current = root.clone();
 
     let mut author = String::new();
     let mut save = String::new();
-    // k, e, karma or event
+    // k/karma or e/event
     let mut condition = DialogCondition::default();
     // CANT due to reading text one letter/number by one: avoid using karma as a string into .parse::<i32>().unwrap()
     // let mut negative_karma = false;
@@ -615,7 +634,7 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
     let mut event = String::new();
 
     // init with text
-    let mut dialog_type: DialogType = DialogType::new_text();
+    let mut dialog_content: DialogContent = DialogContent::new_text();
 
     // Check if a given char should be insert as text
     // allow to have text with special char (like - / # )
@@ -624,14 +643,11 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
     let mut header_numbers = 0;
     let mut last_header_numbers = 0;
 
-    // REFACTOR: Use InitPhase
-    let mut author_phase = false;
-    let mut content_phase = false;
-    let mut condition_phase = false;
+    let mut phase: Option<InitPhase> = None;
 
     let mut karma_phase = false;
     let mut event_phase = false;
-    // allow to write `event:` or `ejhlksdfh:` instend of `e:`
+    // allow to write `e:` or `ejhlksdfh:` instead of `event:`
     let mut post_colon = false;
 
     let mut trigger_phase = false;
@@ -639,20 +655,19 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
     // let mut new_line = false;
 
     let chars = s.chars().collect::<Vec<char>>();
-    // println!("{}", chars.len());
-    // println!("{}", s);
+    // DEBUG: println!("{}", chars.len());
+    // DEBUG: println!("{}", s);
 
     for (_, c) in chars
         .iter()
         .enumerate()
         .filter(|(idx, _)| *idx < chars.len())
     {
-        // println!("c: {}", *c);
-
-        if (condition_phase || author_phase) && content_phase || (author_phase && condition_phase) {
-            panic!("Illegal Combinaison of phase; author phase: {}, content phase: {}, condition phase: {}",
-            author_phase, content_phase, condition_phase);
-        }
+        // DEBUG: Print working symbol
+        // println!(
+        //     "c: {}, {:?}, event_phase: {event_phase}, karma_phase: {karma_phase}",
+        //     *c, phase
+        // );
 
         /* -------------------------------------------------------------------------- */
         /*                                 Transitions                                */
@@ -660,66 +675,79 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
 
         if *c == '#' && !except {
             header_numbers += 1;
-            author_phase = true;
+            phase = Some(InitPhase::AuthorPhase);
         }
-        // !condition_phase to permit negative number in the karma threshold
-        else if *c == '-' && !condition_phase && !except {
-            content_phase = true;
-        } else if *c == '>' && content_phase && !except {
-            content_phase = false;
+        // phase != InitPhase::ConditionPhase to permit negative number in the karma threshold
+        else if *c == '-' && phase != Some(InitPhase::ConditionPhase) && !except {
+            phase = Some(InitPhase::ContentPhase);
+        } else if *c == '>' && phase == Some(InitPhase::ContentPhase) && !except {
+            phase = None;
             trigger_phase = true;
-        } else if *c == '|' && content_phase && !except {
+        } else if *c == '|' && phase == Some(InitPhase::ContentPhase) && !except {
             while save.starts_with(' ') {
                 save.remove(0);
             }
 
-            dialog_type = DialogType::new_choice();
+            dialog_content = DialogContent::new_choice();
 
-            condition_phase = true;
-            content_phase = !content_phase;
-        } else if *c == ',' && karma_phase && condition_phase {
-            // can be solved with karma_min, karma_max
-            // println!("karma 1rst elem: {}", karma);
-            let k: i32;
-            // karma = karma.to_uppercase();
-            if karma == *"MAX" || karma == *"max" {
-                k = KARMA_MAX;
+            phase = Some(InitPhase::ConditionPhase);
+        } else if *c == ',' && karma_phase && phase == Some(InitPhase::ConditionPhase) {
+            // DEBUG: println!("karma 1rst elem: {}", karma);
+            let k: i32 = if karma == *"MAX" || karma == *"max" {
+                match infos.karma_limits {
+                    // TODO: Send Err
+                    None => {
+                        warn!("This `karma_limits` is not definded in `infos`");
+                        0
+                    }
+                    Some((_, max)) => max,
+                }
             } else if karma == *"MIN" || karma == *"min" {
-                k = KARMA_MIN;
+                match infos.karma_limits {
+                    // TODO: Send Err
+                    None => {
+                        warn!("This `karma_limits` is not definded in `infos`");
+                        0
+                    }
+                    Some((min, _)) => min,
+                }
             } else {
-                k = karma.parse::<i32>().unwrap();
-            }
-            condition.karma_threshold = Some((k, KARMA_MAX));
+                karma.parse::<i32>().unwrap()
+            };
+            condition.karma_threshold = match infos.karma_limits {
+                None => Some((k, 0)),
+                Some((_, max)) => Some((k, max)),
+            };
 
-            // reuse this variable
             karma.clear();
         }
-        //
-        // End of Phase
-        //
-        else if *c == '\n' && author_phase {
+        /* -------------------------------------------------------------------------- */
+        /*                                End of Phase                                */
+        /* -------------------------------------------------------------------------- */
+        else if *c == '\n' && phase == Some(InitPhase::AuthorPhase) {
             while author.starts_with(' ') {
                 author.remove(0);
             }
-            // println!("author: {}", author);
+            // DEBUG: println!("author: {}", author);
 
             // root: header_numbers != 1
             if last_header_numbers != 0 {
-                // println!("previous:\n{}", current.borrow().print_file());
-                // println!("last_header_numbers {}", last_header_numbers);
-                // println!("header_numbers {}", header_numbers);
+                // DEBUG: println!("previous:\n{}", current.borrow().print_file());
+                // DEBUG: println!("last_header_numbers {}", last_header_numbers);
+                // DEBUG: println!("header_numbers {}", header_numbers);
 
-                // set current to the parent of the incomming node
-                // if last_header_numbers - header_numbers +1 == 0;
-                //     cause 0..0 = 0 iteration
-                // then current = incomming node's parent
-                // so skip this step
+                /* set current to the parent of the incomming node
+                 * if last_header_numbers - header_numbers +1 == 0;
+                 *     cause 0..0 = 0 iteration
+                 * then current = incomming node's parent
+                 * so skip this step
+                 */
                 let limit = last_header_numbers - header_numbers + 1;
                 for _step in 0..limit {
-                    // println!("step {}", _step);
+                    // DEBUG: println!("step {}", _step);
                     // should not panic anyway
                     let parent = current.clone().borrow().parent.clone();
-                    // println!(
+                    // DEBUG: println!(
                     //     "parent {}:\n{}",
                     //     _step,
                     //     parent.clone().unwrap().borrow().print_file()
@@ -747,7 +775,7 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
             }
 
             // REFACTOR: give the real entity_id or remove id
-            current.borrow_mut().author = Some((0, author.to_owned()));
+            current.borrow_mut().author = Some(author.to_owned());
 
             author.clear();
 
@@ -755,13 +783,27 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
             header_numbers = 0;
 
             except = false;
-            author_phase = false;
+            phase = None;
         } else if *c == ';' && karma_phase {
-            // println!("karma: {}", karma);
+            // DEBUG: println!("karma: {}", karma);
             let k: i32 = if karma == *"MAX" || karma == *"max" {
-                KARMA_MAX
+                match infos.karma_limits {
+                    // TODO: Send Err
+                    None => {
+                        warn!("This `karma_limits` is not definded in `infos`");
+                        0
+                    }
+                    Some((_, max)) => max,
+                }
             } else if karma == *"MIN" || karma == *"min" {
-                KARMA_MIN
+                match infos.karma_limits {
+                    // TODO: Send Err
+                    None => {
+                        warn!("This `karma_limits` is not definded in `infos`");
+                        0
+                    }
+                    Some((min, _)) => min,
+                }
             } else {
                 karma.parse::<i32>().unwrap()
             };
@@ -770,7 +812,7 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
                 None => {
                     warn!("init creation condition has been skipped");
                 }
-                // _ cause the second `i32` is `KARMA_MAX` (placeholder)
+                // `_` cause the second `i32` is a placeholder
                 Some((x, _)) => {
                     if x <= k {
                         condition.karma_threshold = Some((x, k));
@@ -783,104 +825,110 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
 
             karma_phase = false;
         } else if (*c == ';' || *c == ',') && event_phase {
-            // println!("event : {}", event);
-            let e = event.parse::<GameEvent>().unwrap();
-            match condition.event {
-                Some(vec) => {
-                    let mut events = vec.clone();
-                    events.push(e);
-                    condition.event = Some(events);
+            // DEBUG: println!("event : {}", event);
+            if infos.world_event.contains(&event) {
+                match condition.event {
+                    Some(ref mut vec) => {
+                        vec.push(event.clone());
+                    }
+                    None => condition.event = Some(vec![event.clone()]),
                 }
-                None => condition.event = Some(vec![e]),
+            } else {
+                // TODO: Send Err
+                warn!("This `WorldEvent` is not definded in `infos`");
             }
 
-            // println!("event cleared");
+            // DEBUG: println!("event cleared");
             event.clear();
 
             if *c == ';' {
                 event_phase = false;
             }
-        } else if *c == '\n' && condition_phase && dialog_type.is_choice()
+        } else if *c == '\n'
+            && phase == Some(InitPhase::ConditionPhase)
+            && dialog_content.is_choice()
         // && !karma_phase
         // && !event_phase
         {
-            // remove the space on the first position
+            // remove all spaces from edge positions
             while save.starts_with(' ') {
                 save.remove(0);
             }
-
-            // remove the space on the last position
             while save.ends_with(' ') {
                 save.remove(save.len() - 1);
             }
 
-            // println!("choice inserted: {}", save);
+            // DEBUG: println!("choice inserted: {}", save);
 
-            let choice: DialogType = match (condition.karma_threshold, condition.clone().event) {
-                (None, None) => DialogType::Choice {
+            let choice: DialogContent = match (condition.karma_threshold, condition.clone().event) {
+                (None, None) => DialogContent::Choice {
                     text: save.clone(),
                     condition: None,
                 },
-                (Some(_), None) | (None, Some(_)) | (Some(_), Some(_)) => DialogType::Choice {
+                (Some(_), None) | (None, Some(_)) | (Some(_), Some(_)) => DialogContent::Choice {
                     text: save.clone(),
                     condition: Some(condition.clone()),
                 },
             };
 
-            current.borrow_mut().dialog_type.push(choice);
+            current.borrow_mut().dialog_content.push(choice);
 
-            condition_phase = false;
+            phase = None;
+            karma_phase = false;
+            event_phase = false;
 
             save.clear();
             condition = DialogCondition::default();
         } else if *c == '\n'
-            && content_phase
+            && phase == Some(InitPhase::ContentPhase)
             && !save.is_empty()
-            && dialog_type.is_text()
+            && dialog_content.is_text()
             && !except
         {
-            // remove the space on the first position
+            // remove all spaces from edge positions
             while save.starts_with(' ') {
                 save.remove(0);
             }
-
-            // remove the space on the last position
             while save.ends_with(' ') {
                 save.remove(save.len() - 1);
             }
 
-            // println!("text inserted: {}", save);
+            // DEBUG: println!("text inserted: {}", save);
 
-            let dialog = DialogType::Text(save.clone());
-            current.borrow_mut().dialog_type.push(dialog);
+            let dialog = DialogContent::Text(save.clone());
+            current.borrow_mut().dialog_content.push(dialog);
 
             save.clear();
 
-            content_phase = false;
+            phase = None;
         } else if (*c == ',' || *c == '\n') && trigger_phase {
-            // println!("event : {}", event);
-            let e = event.parse::<ThrowableEvent>().unwrap();
+            // DEBUG: println!("event : {}", event);
+            if infos.trigger_event.contains(&event) {
+                current.borrow_mut().trigger_event.push(event.clone());
+            } else {
+                // TODO: Send Err
+                warn!("This `TriggerEvent` is not definded in `infos`");
+            }
 
-            // add the triggered event to the vector of the current DialogNode
-            current.borrow_mut().trigger_event.push(e);
-
-            // println!("event cleared");
+            // DEBUG: println!("event cleared");
             event.clear();
 
             if *c == '\n' {
                 trigger_phase = false;
             }
         }
-        // read text or condition
+        /* -------------------------------------------------------------------------- */
+        /*                              Text or Condition                             */
+        /* -------------------------------------------------------------------------- */
         else if c.is_ascii() || c.is_alphanumeric() {
-            // the except char is /
+            // the except char is `/`
             if *c == '/' {
-                // info!("except");
+                // DEBUG: info!("except");
                 except = true;
             }
             // `;` or `\n` put an end to the selection of condtion
-            else if condition_phase {
-                if *c == 'k' {
+            else if phase == Some(InitPhase::ConditionPhase) {
+                if *c == 'k' && !event_phase {
                     karma_phase = true;
                     post_colon = true;
                 } else if *c == 'e' && !event_phase {
@@ -897,11 +945,11 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
                     // negative symbol -
                     karma.push(*c);
 
-                    println!("k: {}", karma);
+                    // DEBUG: println!("k: {}", karma);
                 } else if event_phase && *c != ' ' && !post_colon {
                     event.push(*c);
 
-                    // println!("e: {}", event);
+                    // DEBUG: println!("e: {}", event);
                 }
             } else if trigger_phase && *c != ' ' {
                 event.push(*c);
@@ -910,25 +958,22 @@ pub fn init_tree_file(s: String) -> Rc<RefCell<DialogNode>> {
             // the \n is a marker to end some phase
             else if *c == '\n' && !except {
                 // new_line = true;
-                // println!("skip");
+                // DEBUG: println!("skip");
 
                 // full reset
 
-                dialog_type = DialogType::new_text();
+                dialog_content = DialogContent::new_text();
 
-                author_phase = false;
-                content_phase = false;
-                // useless protection cause by if condition_phase just above
-                // condition_phase = false;
-            } else if author_phase && *c != '#' {
+                phase = None;
+            } else if phase == Some(InitPhase::AuthorPhase) && *c != '#' {
                 author.push(*c);
             }
-            // if !is_special_char_file(*c) || (is_special_char_file(*c) && except)
+            // else if !is_special_char_file(*c) || (is_special_char_file(*c) && except)
             else {
                 save.push(*c);
                 except = false;
 
-                // println!("add {} ", *c);
+                // DEBUG: println!("add {} ", *c);
             }
         }
     }

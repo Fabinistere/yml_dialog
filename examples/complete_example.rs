@@ -1,6 +1,13 @@
 //! Complete Example of a three Dialog.
 //!
 //! The NPC choice AI is not implemented.
+//!
+//! - Press any key to continue the dialog.
+//! - Choose your answer with the down right buttons.
+//! - You can press the reset button to ... to reset.
+//! - Click on one of the three frog portrait above.
+
+use std::fmt;
 
 use bevy::{
     input::{keyboard::KeyboardInput, ButtonState},
@@ -9,7 +16,9 @@ use bevy::{
     window::WindowResolution,
     winit::WinitSettings,
 };
-use fto_dialog::{init_tree_file, DialogType};
+use fto_dialog::{init_tree_file, DialogContent, DialogCustomInfos};
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 // dark purple #25131a = 39/255, 19/255, 26/255
 const CLEAR: bevy::render::color::Color = bevy::render::color::Color::rgb(0.153, 0.07, 0.102);
@@ -56,7 +65,7 @@ impl Dialog {
 #[derive(Component)]
 struct Portrait;
 
-/// Points to a NPC portrait on the dialog Panel.
+/// Points to the NPC portrait on the dialog Panel.
 #[derive(Component)]
 struct InterlocutorPortait;
 
@@ -85,6 +94,23 @@ impl Default for PlayerPanel {
 #[derive(Deref, DerefMut, Default, Component)]
 struct NPCPanel {
     texts: Vec<String>,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, EnumIter)]
+enum WorldEvent {
+    FrogLove,
+    FrogHate,
+    FrogTalk,
+}
+
+impl fmt::Display for WorldEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            WorldEvent::FrogLove => write!(f, "FrogLove"),
+            WorldEvent::FrogHate => write!(f, "FrogHate"),
+            WorldEvent::FrogTalk => write!(f, "FrogTalk"),
+        }
+    }
 }
 
 // TODO: Visual - DialogPanel Seperator + background
@@ -226,9 +252,20 @@ fn dialog_dive(
                 match dialog.current_node {
                     None => {}
                     Some(ref mut current_node) => {
-                        let dialog_tree = init_tree_file(current_node.to_owned());
+                        let dialog_tree = init_tree_file(
+                            current_node.to_owned(),
+                            DialogCustomInfos::new(
+                                WorldEvent::iter()
+                                    .map(|x| x.to_string())
+                                    .collect::<Vec<String>>(),
+                                None,
+                                WorldEvent::iter()
+                                    .map(|x| x.to_string())
+                                    .collect::<Vec<String>>(),
+                            ),
+                        );
 
-                        if dialog_tree.borrow().author().unwrap().1 == "Player" {
+                        if dialog_tree.borrow().author().unwrap() == "Player" {
                             let mut player_panel = player_panel_query.single_mut();
                             match player_panel.clone() {
                                 // The monologue is not finished
@@ -336,18 +373,30 @@ fn update_dialog_panel(
                 *player_panel = PlayerPanel::default();
             }
             Some(current_node) => {
-                let dialog_tree = init_tree_file(current_node.to_owned());
+                let dialog_tree = init_tree_file(
+                    current_node.to_owned(),
+                    DialogCustomInfos::new(
+                        WorldEvent::iter()
+                            .map(|x| x.to_string())
+                            .collect::<Vec<String>>(),
+                        None,
+                        WorldEvent::iter()
+                            .map(|x| x.to_string())
+                            .collect::<Vec<String>>(),
+                    ),
+                );
 
                 let current = &dialog_tree.borrow();
-                let dialogs = &current.dialog_type;
+                let dialogs = &current.dialog_content;
 
                 match &dialogs.first() {
-                    None => panic!("Err: dialog_type is empty"),
-                    Some(DialogType::Text(_)) => {
+                    None => panic!("Err: dialog_content is empty"),
+                    Some(DialogContent::Text(_)) => {
                         let mut texts = Vec::<String>::new();
+                        // REFACTOR: We could just put the first one
                         for dialog in dialogs.iter() {
                             match dialog {
-                                    DialogType::Text(text) => {
+                                    DialogContent::Text(text) => {
                                         texts.push(text.to_owned());
                                         // info!("DEBUG: add text: {}", text);
                                     }
@@ -356,7 +405,7 @@ fn update_dialog_panel(
                                     ),
                                 }
                         }
-                        if &current.author().unwrap().1 == "Player" {
+                        if &current.author().unwrap() == "Player" {
                             *player_panel = PlayerPanel::Texts(texts)
                         } else {
                             // replace the entire npc panel's content
@@ -373,7 +422,7 @@ fn update_dialog_panel(
                         }
                     }
                     // NOTE: In this example, NPC can't have choice :0
-                    Some(DialogType::Choice {
+                    Some(DialogContent::Choice {
                         text: _,
                         condition: _,
                     }) => {
@@ -381,7 +430,7 @@ fn update_dialog_panel(
                         let mut choices = Vec::<String>::new();
                         for dialog in dialogs.iter() {
                             match dialog {
-                                DialogType::Choice { text, condition: _ } => {
+                                DialogContent::Choice { text, condition: _ } => {
                                     // We do not test the condition in this example
                                     choices.push(text.to_owned());
                                     // info!("DEBUG: add choice: {}", text);
@@ -436,6 +485,7 @@ fn update_text_panels(
                 text.sections[0].value = String::new();
 
                 for (choice_index, mut visibility, children) in &mut choice_query {
+                    // TODO: Verify condition !
                     if choice_index.0 < choices.len() {
                         let mut text = text_query.get_mut(children[0]).unwrap();
                         text.sections[0].value = choices[choice_index.0].clone();
@@ -510,57 +560,54 @@ fn spawn_camera(mut commands: Commands) {
     commands.spawn(camera);
 }
 
+pub const OLD_FROG_DIALOG: &str = "# Old Frog
+
+- KeroKero
+
+## Old Frog
+
+- I want you to talk with the last Frog
+
+### Old Frog
+
+- All the way.
+
+#### Player
+
+- Done ? | e: FrogTalk;
+
+##### Old Frog
+
+- You have my respect.
+
+##### Old Frog
+
+- Press Reset or alt+f4.\n";
+
 pub const FROG_DIALOG: &str = "# Frog
 
 - KeroKero
 
 ## Frog
 
-- /<3
+- I wanted to say you something
 
 ### Player
 
-- Hey | None
-- No Hello | None
-- Want to share a flat ? | None
+- You = Cool | None
+- You = Not Cool | None
 
 #### Frog
 
-- :)
+- Big love on you
+
+-> FrogLove
 
 #### Frog
 
-- :O
+- I'm sad now.
 
-#### Frog
-
-- Sure\n";
-
-pub const OLD_FROG_DIALOG: &str = "# Old Frog
-
-- Hello
-
-## Old Frog
-
-- /<3
-
-### Player
-
-- Hey | None
-- No Hello | None
-- Want to share a flat ? | None
-
-#### Old Frog
-
-- :)
-
-#### Old Frog
-
-- :O
-
-#### Old Frog
-
-- Sure\n";
+-> FrogHate\n";
 
 pub const WARRIOR_DIALOG: &str = "# Warrior Frog
 
@@ -568,25 +615,28 @@ pub const WARRIOR_DIALOG: &str = "# Warrior Frog
 
 ## Warrior Frog
 
-- /<3
+- I mean... KeroKero
 
-### Player
+### Warrior Frog
 
-- Hey | None
-- No Hello | None
-- Want to share a flat ? | None
+- Can you bring my love to my homegirl the Frog in the Middle ?
 
-#### Warrior Frog
+#### Player
+
+- Oh Jeez I messed up | e: FrogHate;
+- THe Frog is in love | e: FrogLove;
+
+##### Warrior Frog
+
+- :0
+
+-> FrogTalk
+
+##### Warrior Frog
 
 - :)
 
-#### Warrior Frog
-
-- :O
-
-#### Warrior Frog
-
-- Sure\n";
+-> FrogTalk\n";
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands

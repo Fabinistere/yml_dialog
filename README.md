@@ -14,6 +14,7 @@
 Accordingly to this [discussion](https://github.com/bevyengine/bevy/discussions/1202),
 this is not a trivial question.
 
+- md-to-dialog-tree
 - fto-dialog
 - bevy_dialog
 - bevy_dialog_system
@@ -21,12 +22,23 @@ this is not a trivial question.
 
 ## RoadMap
 
-- [ ] fully functional API to implement a dialog system into a bevy game
-  - [ ] Follow all guidelines from [Bevy plugins guidelines](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md)
-  - [ ] create documentation
-    - [ ] create an example
-    - [ ] list all `SystemSet` available from this plugin
-    - [ ] list all `Component` available from this plugin
+- [ ] fully functional API to implement a dialog system into a (bevy game or any) app
+  - [ ] Exclude Bevy dependency
+    - [ ] or list all
+      - [ ] `SystemSet` available from this plugin
+      - [ ] `Component` available from this plugin
+    - [ ] Follow all guidelines from [Bevy plugins guidelines](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md)
+  - [ ] Follow all guidelines from [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/checklist.html)
+    - [ ] Documentation
+      - [x] create an example
+    - [ ] Interoperability
+      - [x] Types eagerly implement common traits
+    - [ ] Macros
+  - [ ] Usage
+    - [ ] [Dynamic Macros](https://stackoverflow.com/a/63849405)
+      - [ ] custom `enum WorldEvent`
+      - [ ] custom `enum TriggerEvent`
+      - [ ] custom `struct DialogCondition`
 
 ## Example
 
@@ -40,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 This project also follows to [A successful Git branching model](https://nvie.com/posts/a-successful-git-branching-model/).
 
 We have to respect all the [rust API convention](https://rust-lang.github.io/api-guidelines/checklist.html).
-Run `cargo clippy` as frequently as possible.
+Run `cargo clippy`, `cargo doc` before commit.
 
 ## License
 
