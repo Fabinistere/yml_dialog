@@ -90,28 +90,66 @@ impl DialogContent {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub struct DialogCondition {
     karma_threshold: Option<(i32, i32)>,
-    event: Option<Vec<String>>,
+    events: Option<Vec<String>>,
 }
 
 impl DialogCondition {
     /// Construct a new DialogCondition with the given `karma_threshold` and `event`.
-    pub fn new(karma_threshold: Option<(i32, i32)>, event: Option<Vec<String>>) -> DialogCondition {
+    pub fn new(
+        karma_threshold: Option<(i32, i32)>,
+        events: Option<Vec<String>>,
+    ) -> DialogCondition {
         DialogCondition {
             karma_threshold,
-            event,
+            events,
         }
     }
 
-    /// Only check if the `karma` is within the range of the condition
+    /// Only check if the given `karma` is within the range of the condition
     ///
     /// # Note
     ///
-    /// TODO: feature - also check if its event has been already triggered in the game
-    pub fn is_verified(&self, karma: i32) -> bool {
+    /// NOTE: Could be depreciated to only use `is_verified`
+    pub fn is_karma_verified(&self, karma: i32) -> bool {
         match self.karma_threshold {
             None => true,
             Some(karma_threshold) => karma >= karma_threshold.0 && karma <= karma_threshold.1,
         }
+    }
+
+    /// Only check if the condition's event is contained in the given `events`
+    ///
+    /// # Note
+    ///
+    /// NOTE: Could be depreciated to only use `is_verified`
+    pub fn is_events_verified(&self, events: Vec<String>) -> bool {
+        match self.events() {
+            None => true,
+            Some(events_to_have) => {
+                let mut all_contained = true;
+                for event in events_to_have {
+                    if !events.contains(event) {
+                        all_contained = false;
+                        break;
+                    }
+                }
+                all_contained
+            }
+        }
+    }
+
+    /// Verify a Choice's condition
+    pub fn is_verified(&self, karma: Option<i32>, events: Option<Vec<String>>) -> bool {
+        let karma_verified = match karma {
+            None => self.karma_threshold == None,
+            Some(karma) => self.is_karma_verified(karma),
+        };
+        let events_verified = match events {
+            None => self.events() == &None,
+            Some(events) => self.is_events_verified(events),
+        };
+
+        karma_verified && events_verified
     }
 
     /// Returns the read-only `karma_threshold` item of the `DialogCondition`.
@@ -125,13 +163,13 @@ impl DialogCondition {
     }
 
     /// Returns the read-only `event` item of the `DialogCondition`.
-    pub fn event(&self) -> &Option<Vec<String>> {
-        &self.event
+    pub fn events(&self) -> &Option<Vec<String>> {
+        &self.events
     }
 
     /// Returns the mtable reference `event` item of the `DialogCondition`.
-    pub fn event_mut(&mut self) -> &mut Option<Vec<String>> {
-        &mut self.event
+    pub fn events_mut(&mut self) -> &mut Option<Vec<String>> {
+        &mut self.events
     }
 }
 
@@ -150,26 +188,47 @@ pub struct DialogNode {
     ///   - each with certain conditions to be enabled
     /// - A Roaster of line from a monologue.
     ///   - TODO: with a priority system to alloy important event
-    pub dialog_content: Vec<DialogContent>,
+    dialog_content: Vec<DialogContent>,
     /// The potential name of the speaker.
-    pub author: Option<String>,
+    author: Option<String>,
     /// Vector of its subtree.
-    pub children: Vec<Rc<RefCell<DialogNode>>>,
+    children: Vec<Rc<RefCell<DialogNode>>>,
     /// Its potential Parent.
     ///
     /// # Note
     ///
     /// maybe too much (prefer a stack in the TreeIterator)
-    pub parent: Option<Rc<RefCell<DialogNode>>>,
+    parent: Option<Rc<RefCell<DialogNode>>>,
     /// All events triggered by this dialogue.
     ///
     /// # Note
     ///
     /// NOTE: CUSTOM (but how...)
-    pub trigger_event: Vec<String>,
+    trigger_event: Vec<String>,
 }
 
 impl DialogNode {
+    /// COnstructs a new DialogNode with the given
+    /// - `content`,
+    /// - `author`,
+    /// - `children`,
+    /// - `parent`
+    /// - `trigger_event`
+    pub fn new(
+        content: Vec<DialogContent>,
+        author: Option<String>,
+        children: Vec<Rc<RefCell<DialogNode>>>,
+        parent: Option<Rc<RefCell<DialogNode>>>,
+        trigger_event: Vec<String>,
+    ) -> Self {
+        DialogNode {
+            dialog_content: content,
+            author,
+            children,
+            parent,
+            trigger_event,
+        }
+    }
     // pub fn is_empty(&self) -> bool {
     //     self.dialog_content.is_empty()
     // }
@@ -184,21 +243,57 @@ impl DialogNode {
     /// # Return
     ///
     /// `true` if the type of the first element (of dialog_content) is choice
+    ///
+    /// ```rust
+    /// let answers = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Choice {
+    ///             text: String::from("Hello"),
+    ///             condition: None,
+    ///         },
+    ///         DialogContent::Choice {
+    ///             text: String::from("No Hello"),
+    ///             condition: None,
+    ///         },
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     Vec::new(),
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// assert!(answers.is_choice())
+    /// ```
     pub fn is_choice(&self) -> bool {
-        if !self.dialog_content.is_empty() {
-            return self.dialog_content[0].is_choice();
+        match self.dialog_content.first() {
+            None => false,
+            Some(first) => first.is_choice(),
         }
-        false
     }
 
     /// # Return
     ///
     /// `true` if the type of the first element (of dialog_content) is choice
+    ///
+    /// ```rust
+    /// let catchphrase = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Text(String::from("Hello")),
+    ///         DialogContent::Text(String::from("How are you?")),
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     Vec::new(),
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// assert!(answers.is_choice())
+    /// ```
     pub fn is_text(&self) -> bool {
-        if !self.dialog_content.is_empty() {
-            return self.dialog_content[0].is_text();
+        match self.dialog_content.first() {
+            None => false,
+            Some(first) => first.is_text(),
         }
-        false
     }
 
     /// Put `new_node` in the end of the children vector.
@@ -206,9 +301,168 @@ impl DialogNode {
         self.children.push(new_node);
     }
 
-    /// Give the author of the node.
-    pub fn author(&self) -> Option<String> {
-        self.author.clone()
+    /// TEMP: If the children is a choice and if there is at least one verified choice
+    ///
+    /// ```rust
+    /// # use std::{rc::Rc, cell::RefCell};
+    /// # use fto_dialog::{DialogNode, DialogContent};
+    /// let answers = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Choice {
+    ///             text: String::from("Hello"),
+    ///             condition: None,
+    ///         },
+    ///         DialogContent::Choice {
+    ///             text: String::from("No Hello"),
+    ///             condition: None,
+    ///         },
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     Vec::new(),
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// let catchphrase = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Text(String::from("Hello")),
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     vec![Rc::new(RefCell::new(answers))],
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// assert!(catchphrase.at_least_one_child_is_verified(None, None))
+    /// ```
+    ///
+    /// ```rust
+    /// # use std::{rc::Rc, cell::RefCell};
+    /// # use fto_dialog::{DialogNode, DialogContent};
+    /// let answer = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Text(String::from("No, you're cool"))
+    ///     ],
+    ///     Some("Not You".to_string()),
+    ///     Vec::new(),
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// let catchphrase = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Text(String::from("Hello CoolFolk")),
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     vec![Rc::new(RefCell::new(answer))],
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// assert!(catchphrase.at_least_one_child_is_verified(None, None))
+    /// ```
+    ///
+    /// ```rust
+    /// # use std::{rc::Rc, cell::RefCell};
+    /// # use fto_dialog::{DialogNode, DialogContent, DialogCondition};
+    /// let answers = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Choice {
+    ///             text: String::from("Hello"),
+    ///             condition: Some(DialogCondition::new(Some((50, 100)), None)),
+    ///         },
+    ///         DialogContent::Choice {
+    ///             text: String::from("No Hello"),
+    ///             condition: Some(DialogCondition::new(Some((-50, 0)), None)),
+    ///         },
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     Vec::new(),
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// let catchphrase = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Text(String::from("Hello")),
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     vec![Rc::new(RefCell::new(answers))],
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// assert!(!catchphrase.at_least_one_child_is_verified(Some(20), None))
+    /// ```
+    pub fn at_least_one_child_is_verified(
+        &self,
+        karma: Option<i32>,
+        events: Option<Vec<String>>,
+    ) -> bool {
+        for child in &self.children {
+            for content in child.borrow().content() {
+                match content {
+                    DialogContent::Text(_) => return true,
+                    DialogContent::Choice { text: _, condition } => {
+                        return match condition {
+                            None => true,
+                            Some(condition) => condition.is_verified(karma, events),
+                        };
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Give the read-only author of the node.
+    pub fn author(&self) -> &Option<String> {
+        &self.author
+    }
+
+    /// Give the mutable author of the node.
+    pub fn author_mut(&mut self) -> &mut Option<String> {
+        &mut self.author
+    }
+
+    /// Give the read-only content of the node.
+    pub fn content(&self) -> &Vec<DialogContent> {
+        &self.dialog_content
+    }
+
+    /// Give the mutable content of the node.
+    pub fn content_mut(&mut self) -> &mut Vec<DialogContent> {
+        &mut self.dialog_content
+    }
+
+    /// Give the read-only `children` of the node.
+    pub fn children(&self) -> &Vec<Rc<RefCell<DialogNode>>> {
+        &self.children
+    }
+
+    /// Give the mutable children of the node.
+    pub fn children_mut(&mut self) -> &mut Vec<Rc<RefCell<DialogNode>>> {
+        &mut self.children
+    }
+
+    /// Give the read-only `parent` of the node.
+    pub fn parent(&self) -> &Option<Rc<RefCell<DialogNode>>> {
+        &self.parent
+    }
+
+    /// Give the mutable parent of the node.
+    pub fn parent_mut(&mut self) -> &mut Option<Rc<RefCell<DialogNode>>> {
+        &mut self.parent
+    }
+
+    /// Give the read-only `trigger_event` of the node.
+    pub fn trigger_event(&self) -> &Vec<String> {
+        &self.trigger_event
+    }
+
+    /// Give the mutable trigger_event of the node.
+    pub fn trigger_event_mut(&mut self) -> &mut Vec<String> {
+        &mut self.trigger_event
     }
 
     /// # Convention
@@ -279,7 +533,7 @@ impl DialogNode {
                             ));
                         }
 
-                        match &dialog_condition.event {
+                        match &dialog_condition.events() {
                             Some(events) => {
                                 if !events.is_empty() {
                                     // DOC: events in plurial ?
@@ -827,11 +1081,11 @@ pub fn init_tree_file(s: String, infos: DialogCustomInfos) -> Rc<RefCell<DialogN
         } else if (*c == ';' || *c == ',') && event_phase {
             // DEBUG: println!("event : {}", event);
             if infos.world_event.contains(&event) {
-                match condition.event {
+                match condition.events_mut() {
                     Some(ref mut vec) => {
                         vec.push(event.clone());
                     }
-                    None => condition.event = Some(vec![event.clone()]),
+                    None => *condition.events_mut() = Some(vec![event.clone()]),
                 }
             } else {
                 // TODO: Send Err
@@ -860,16 +1114,19 @@ pub fn init_tree_file(s: String, infos: DialogCustomInfos) -> Rc<RefCell<DialogN
 
             // DEBUG: println!("choice inserted: {}", save);
 
-            let choice: DialogContent = match (condition.karma_threshold, condition.clone().event) {
-                (None, None) => DialogContent::Choice {
-                    text: save.clone(),
-                    condition: None,
-                },
-                (Some(_), None) | (None, Some(_)) | (Some(_), Some(_)) => DialogContent::Choice {
-                    text: save.clone(),
-                    condition: Some(condition.clone()),
-                },
-            };
+            let choice: DialogContent =
+                match (condition.karma_threshold(), condition.clone().events()) {
+                    (None, None) => DialogContent::Choice {
+                        text: save.clone(),
+                        condition: None,
+                    },
+                    (Some(_), None) | (None, Some(_)) | (Some(_), Some(_)) => {
+                        DialogContent::Choice {
+                            text: save.clone(),
+                            condition: Some(condition.clone()),
+                        }
+                    }
+                };
 
             current.borrow_mut().dialog_content.push(choice);
 

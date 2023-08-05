@@ -1,13 +1,9 @@
 //! Complete Example of a three Dialog.
 //!
-//! The NPC choice AI is not implemented.
-//!
 //! - Press any key to continue the dialog.
 //! - Choose your answer with the down right buttons.
 //! - You can press the reset button to ... to reset.
 //! - Click on one of the three frog portrait above.
-
-use std::fmt;
 
 use bevy::{
     input::{keyboard::KeyboardInput, ButtonState},
@@ -16,9 +12,12 @@ use bevy::{
     window::WindowResolution,
     winit::WinitSettings,
 };
-use fto_dialog::{init_tree_file, DialogContent, DialogCustomInfos};
+use rand::seq::SliceRandom;
+use std::{fmt, str::FromStr};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
+
+use fto_dialog::{init_tree_file, DialogContent, DialogCustomInfos};
 
 // dark purple #25131a = 39/255, 19/255, 26/255
 const CLEAR: bevy::render::color::Color = bevy::render::color::Color::rgb(0.153, 0.07, 0.102);
@@ -36,6 +35,43 @@ const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
 #[derive(Debug, Reflect, Deref, DerefMut, Clone, Default, Resource)]
 struct CurrentInterlocutor {
     interlocutor: Option<Entity>,
+}
+
+/// Points to the current entity, if they exist, who we're talking with.
+/// Query this entity to get the current Dialog.
+#[derive(Debug, Deref, DerefMut, Clone, Default, Resource)]
+struct ActiveWorldEvents {
+    active_world_events: Vec<WorldEvent>,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, EnumIter)]
+enum WorldEvent {
+    FrogLove,
+    FrogHate,
+    FrogTalk,
+}
+
+impl fmt::Display for WorldEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            WorldEvent::FrogLove => write!(f, "FrogLove"),
+            WorldEvent::FrogHate => write!(f, "FrogHate"),
+            WorldEvent::FrogTalk => write!(f, "FrogTalk"),
+        }
+    }
+}
+
+impl FromStr for WorldEvent {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<WorldEvent, Self::Err> {
+        match input {
+            "FrogTalk" => Ok(WorldEvent::FrogTalk),
+            "FrogLove" => Ok(WorldEvent::FrogLove),
+            "FrogHate" => Ok(WorldEvent::FrogHate),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default, Component)]
@@ -78,40 +114,11 @@ struct Choice(usize);
 #[derive(Component)]
 struct Reset;
 
-/// IDEA: Only one field `content` ? to avoid having texts and choices at the same time
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Component)]
-enum PlayerPanel {
-    Texts(Vec<String>),
-    Choices(Vec<String>),
-}
+#[derive(Component)]
+struct PlayerPanel;
 
-impl Default for PlayerPanel {
-    fn default() -> PlayerPanel {
-        PlayerPanel::Texts(Vec::default())
-    }
-}
-
-#[derive(Deref, DerefMut, Default, Component)]
-struct NPCPanel {
-    texts: Vec<String>,
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, EnumIter)]
-enum WorldEvent {
-    FrogLove,
-    FrogHate,
-    FrogTalk,
-}
-
-impl fmt::Display for WorldEvent {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            WorldEvent::FrogLove => write!(f, "FrogLove"),
-            WorldEvent::FrogHate => write!(f, "FrogHate"),
-            WorldEvent::FrogTalk => write!(f, "FrogTalk"),
-        }
-    }
-}
+#[derive(Component)]
+struct NPCPanel;
 
 // TODO: Visual - DialogPanel Seperator + background
 
@@ -136,7 +143,9 @@ fn main() {
                 .set(ImagePlugin::default_nearest()),
         )
         .insert_resource(CurrentInterlocutor::default())
+        .insert_resource(ActiveWorldEvents::default())
         .add_event::<DialogDiveEvent>()
+        .add_event::<TriggerEvents>()
         .add_startup_systems((setup, spawn_camera))
         .add_systems((
             continue_dialog,
@@ -145,7 +154,7 @@ fn main() {
             switch_dialog,
             dialog_dive,
             update_dialog_panel,
-            update_text_panels,
+            trigger_event_handler.after(dialog_dive),
             change_interlocutor_portrait,
             button_system,
             // button_visibility,
@@ -155,6 +164,7 @@ fn main() {
 }
 
 fn reset_system(
+    mut active_world_events: ResMut<ActiveWorldEvents>,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<Reset>, With<Button>)>,
     mut dialog_query: Query<&mut Dialog, With<Portrait>>,
 ) {
@@ -163,6 +173,7 @@ fn reset_system(
             for mut dialog in &mut dialog_query {
                 dialog.current_node = dialog.root.clone()
             }
+            active_world_events.clear();
         }
     }
 }
@@ -220,7 +231,34 @@ fn continue_dialog(
                 skip: true,
             });
         }
-        // break;
+    }
+}
+
+/// Happens when
+///   - `dialog_dive()`
+///     - when leaving a node
+///
+/// Read in
+///   - `trigger_event_handler()`
+///     - If the event is not already active
+///     add it to the WorldEvent list.
+struct TriggerEvents(Vec<String>);
+
+fn trigger_event_handler(
+    mut trigger_event: EventReader<TriggerEvents>,
+    mut active_world_events: ResMut<ActiveWorldEvents>,
+) {
+    for TriggerEvents(incomming_events) in trigger_event.iter() {
+        for event_to_trigger in incomming_events {
+            match WorldEvent::from_str(&event_to_trigger) {
+                Err(_) => {}
+                Ok(event) => {
+                    if !active_world_events.contains(&event) {
+                        active_world_events.push(event)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -237,10 +275,10 @@ fn continue_dialog(
 fn dialog_dive(
     mut dialog_dive_event: EventReader<DialogDiveEvent>,
     current_interlocutor: Res<CurrentInterlocutor>,
+    active_world_events: Res<ActiveWorldEvents>,
     mut dialog_query: Query<&mut Dialog, With<Portrait>>,
 
-    mut player_panel_query: Query<&mut PlayerPanel>,
-    mut npc_panel_query: Query<&mut NPCPanel>,
+    mut trigger_event: EventWriter<TriggerEvents>,
 ) {
     for DialogDiveEvent { child_index, skip } in dialog_dive_event.iter() {
         // info!("DEBUG: DialogDive Event");
@@ -249,11 +287,13 @@ fn dialog_dive(
             Some(_interlocutor) => {
                 let mut dialog = dialog_query.get_mut(current_interlocutor.unwrap()).unwrap();
 
-                match dialog.current_node {
+                match &dialog.current_node {
                     None => {}
-                    Some(ref mut current_node) => {
+                    Some(current_node_string) => {
+                        // println!("DEBUG: \n{}", dialog.current_node.clone().unwrap());
+
                         let dialog_tree = init_tree_file(
-                            current_node.to_owned(),
+                            current_node_string.to_string(),
                             DialogCustomInfos::new(
                                 WorldEvent::iter()
                                     .map(|x| x.to_string())
@@ -265,65 +305,75 @@ fn dialog_dive(
                             ),
                         );
 
-                        if dialog_tree.borrow().author().unwrap() == "Player" {
-                            let mut player_panel = player_panel_query.single_mut();
-                            match player_panel.clone() {
-                                // The monologue is not finished
-                                PlayerPanel::Texts(texts_queue) => {
-                                    if texts_queue.len() > 1 {
-                                        let (_first, rem) = texts_queue.split_first().unwrap();
-                                        *player_panel = PlayerPanel::Texts(rem.to_vec());
-                                    } else {
-                                        if dialog_tree.borrow().is_end_node() {
-                                            current_node.clear();
+                        let mut current_node = dialog_tree.borrow_mut();
+
+                        match current_node.content().split_first() {
+                            None => {}
+                            Some((first, rem)) => {
+                                match first {
+                                    DialogContent::Text(_) => {
+                                        dialog.current_node = if current_node.content().len() > 1 {
+                                            // The monologue is not finished
+                                            *current_node.content_mut() = rem.to_vec();
+                                            Some(current_node.print_file())
+                                        } else if current_node.is_end_node() {
                                             info!("clear dialog panel");
+                                            trigger_event.send(TriggerEvents(
+                                                current_node.trigger_event().to_vec(),
+                                            ));
+                                            None
+                                        }
+                                        // there is not one choice verified nor a text: don't overwrite the current_node to let the last npc sentence
+                                        else if !current_node.at_least_one_child_is_verified(
+                                            None,
+                                            Some(
+                                                active_world_events
+                                                    .active_world_events
+                                                    .iter()
+                                                    .map(|x| x.to_string())
+                                                    .collect::<Vec<String>>(),
+                                            ),
+                                        ) {
+                                            // no change if this node is still a dead end (even with children)
+                                            dialog.current_node.clone()
+                                        } else {
+                                            trigger_event.send(TriggerEvents(
+                                                current_node.trigger_event().to_vec(),
+                                            ));
+                                            // DOC: Specifics Rules link - Children (Text/Choice)
+                                            Some(
+                                                current_node.children()[*child_index]
+                                                    .borrow()
+                                                    .print_file(),
+                                            )
+                                        };
+                                    }
+                                    DialogContent::Choice {
+                                        text: _,
+                                        condition: _,
+                                    } => {
+                                        if *skip {
+                                            return;
+                                        }
+                                        dialog.current_node = if current_node.is_end_node() {
+                                            info!("clear dialog panel");
+                                            None
                                         } else {
                                             // DOC: Specifics Rules link - Children (Text/Choice)
-                                            let child = dialog_tree.borrow().children[*child_index]
-                                                .borrow()
-                                                .print_file();
-
-                                            *current_node = child;
-                                        }
-                                    }
-                                }
-                                PlayerPanel::Choices(_) => {
-                                    if *skip {
-                                        return;
-                                    }
-                                    if dialog_tree.borrow().is_end_node() {
-                                        dialog.current_node = None;
-                                        info!("clear dialog panel");
-                                    } else {
-                                        // DOC: Specifics Rules link - Children (Text/Choice)
-                                        let child = dialog_tree.borrow().children[*child_index]
-                                            .borrow()
-                                            .print_file();
-
-                                        *current_node = child;
+                                            Some(
+                                                current_node.children()[*child_index]
+                                                    .borrow()
+                                                    .print_file(),
+                                            )
+                                        };
+                                        trigger_event.send(TriggerEvents(
+                                            current_node.trigger_event().to_vec(),
+                                        ));
                                     }
                                 }
                             }
-                        } else {
-                            // REFACTOR: Doublon
-                            let mut npc_texts_queue = npc_panel_query.single_mut();
-                            if npc_texts_queue.len() > 1 {
-                                let (_first, rem) = npc_texts_queue.split_first().unwrap();
-                                npc_texts_queue.texts = rem.to_vec();
-                            } else if !(dialog_tree.borrow().is_choice() && *skip) {
-                                if dialog_tree.borrow().is_end_node() {
-                                    dialog.current_node = None;
-                                    info!("clear dialog panel");
-                                } else {
-                                    // DOC: Specifics Rules link - Children (Text/Choice)
-                                    let child = dialog_tree.borrow().children[*child_index]
-                                        .borrow()
-                                        .print_file();
-
-                                    *current_node = child;
-                                }
-                            }
-                        }
+                        };
+                        // println!("DEBUG: \n{}", dialog.current_node.clone().unwrap());
                     }
                 }
             }
@@ -334,12 +384,12 @@ fn dialog_dive(
 /// # Purpose
 ///
 /// When the dialog file implied in the talk is changed,
-/// updates the scrolls' content.
+/// updates the panels' content.
 ///
 /// # Process
 ///
 /// check the current node from the interlocutor
-///
+/// DOC: TODO
 /// - this is a text
 ///   - change the text from the upper_scroll
 ///   - clear the player_scroll (choice panel)
@@ -351,11 +401,16 @@ fn dialog_dive(
 ///     for now, the player has to choose what the npc should say..
 fn update_dialog_panel(
     current_interlocutor: Res<CurrentInterlocutor>,
+    active_world_events: Res<ActiveWorldEvents>,
     dialog_changed_query: Query<Entity, Changed<Dialog>>,
     dialog_query: Query<&Dialog, With<Portrait>>,
 
-    mut npc_panel_query: Query<&mut NPCPanel>,
-    mut player_panel_query: Query<&mut PlayerPanel>,
+    mut npc_panel_query: Query<&mut Text, (With<NPCPanel>, Without<PlayerPanel>)>,
+    mut player_panel_query: Query<&mut Text, (With<PlayerPanel>, Without<NPCPanel>)>,
+    mut player_choices_query: Query<(&Choice, &mut Visibility, &Children)>,
+    mut text_query: Query<&mut Text, (Without<PlayerPanel>, Without<NPCPanel>)>,
+
+    mut dialog_dive_event: EventWriter<DialogDiveEvent>,
 ) {
     if !current_interlocutor.is_none()
         && (current_interlocutor.is_changed() || !dialog_changed_query.is_empty())
@@ -365,16 +420,20 @@ fn update_dialog_panel(
             .get(current_interlocutor.interlocutor.unwrap())
             .unwrap();
 
-        let mut player_panel = player_panel_query.single_mut();
-        let mut npc_panel = npc_panel_query.single_mut();
+        let mut player_text = player_panel_query.single_mut();
+        let mut npc_text = npc_panel_query.single_mut();
+
         match &dialog.current_node {
             None => {
-                npc_panel.texts = Vec::new();
-                *player_panel = PlayerPanel::default();
+                npc_text.sections[0].value.clear();
+                player_text.sections[0].value.clear();
+                for (_, mut visibility, _) in &mut player_choices_query {
+                    *visibility = Visibility::Hidden;
+                }
             }
-            Some(current_node) => {
+            Some(current) => {
                 let dialog_tree = init_tree_file(
-                    current_node.to_owned(),
+                    current.to_owned(),
                     DialogCustomInfos::new(
                         WorldEvent::iter()
                             .map(|x| x.to_string())
@@ -386,112 +445,120 @@ fn update_dialog_panel(
                     ),
                 );
 
-                let current = &dialog_tree.borrow();
-                let dialogs = &current.dialog_content;
+                let current_node = dialog_tree.borrow();
+                let dialogs = &current_node.content();
 
                 match &dialogs.first() {
+                    // REFACTOR: Stop panic
                     None => panic!("Err: dialog_content is empty"),
-                    Some(DialogContent::Text(_)) => {
-                        let mut texts = Vec::<String>::new();
-                        // REFACTOR: We could just put the first one
-                        for dialog in dialogs.iter() {
-                            match dialog {
-                                    DialogContent::Text(text) => {
-                                        texts.push(text.to_owned());
-                                        // info!("DEBUG: add text: {}", text);
-                                    }
-                                    _ => panic!(
-                                        "Err: DialogTree Incorrect; A texts' vector contains something else"
-                                    ),
-                                }
-                        }
-                        if &current.author().unwrap() == "Player" {
-                            *player_panel = PlayerPanel::Texts(texts)
+                    Some(DialogContent::Text(text)) => {
+                        if current_node.author().clone().unwrap() == "Player" {
+                            player_text.sections[0].value = text.clone();
                         } else {
                             // replace the entire npc panel's content
-
-                            npc_panel.texts = texts;
+                            npc_text.sections[0].value = text.clone();
 
                             // Clear the previous choice if there is any
-                            match player_panel.clone() {
-                                PlayerPanel::Choices(_) => {
-                                    *player_panel = PlayerPanel::Choices(Vec::new());
-                                }
-                                _ => {}
+                            for (_, mut visibility, _) in &mut player_choices_query {
+                                *visibility = Visibility::Hidden;
                             }
                         }
                     }
-                    // NOTE: In this example, NPC can't have choice :0
                     Some(DialogContent::Choice {
                         text: _,
                         condition: _,
                     }) => {
-                        // replace current by the new set of choices
-                        let mut choices = Vec::<String>::new();
-                        for dialog in dialogs.iter() {
-                            match dialog {
-                                DialogContent::Choice { text, condition: _ } => {
-                                    // We do not test the condition in this example
-                                    choices.push(text.to_owned());
-                                    // info!("DEBUG: add choice: {}", text);
+                        if current_node.author().clone().unwrap() == "Player" {
+                            // replace current by the new set of choices
+                            let mut choices = Vec::<String>::new();
+                            for dialog in dialogs.iter() {
+                                match dialog {
+                                    DialogContent::Choice { text, condition } => {
+                                        match condition {
+                                            Some(cond) => {
+                                                if cond.is_verified(
+                                                    None,
+                                                    Some(active_world_events.active_world_events
+                                                        .iter()
+                                                        .map(|x| x.to_string())
+                                                        .collect::<Vec<String>>())
+                                                ) {
+                                                    choices.push(text.to_owned());
+                                                    // info!("DEBUG: add choice: {}", text);
+                                                }
+                                            }
+                                            // no condition
+                                            None => {
+                                                choices.push(text.to_owned());
+                                                // info!("DEBUG: add choice: {}", text);
+                                            }
+                                        }
+                                    }
+                                    _ => panic!(
+                                        "Err: DialogTree Incorrect; A choices' vector contains something else"
+                                    ),
                                 }
-                                _ => panic!(
-                                    "Err: DialogTree Incorrect; A choices' vector contains something else"
-                                ),
+                            }
+                            player_text.sections[0].value.clear();
+
+                            for (choice_index, mut visibility, children) in
+                                &mut player_choices_query
+                            {
+                                // Here you could compare the index with `dialogs.len()` to incorpore all choice but
+                                // lock the unsatisfied choice's condition
+                                if choice_index.0 < choices.len() {
+                                    let mut text = text_query.get_mut(children[0]).unwrap();
+                                    text.sections[0].value = choices[choice_index.0].clone();
+                                    *visibility = Visibility::Inherited;
+                                } else {
+                                    *visibility = Visibility::Hidden;
+                                }
+                            }
+
+                            // Remove all text which aren't said by the current interlocutor
+                            if current_interlocutor.is_changed() {
+                                npc_text.sections[0].value.clear();
+                            }
+                        } else {
+                            // NPC Choices
+                            let mut possible_choices_index: Vec<usize> = Vec::new();
+                            for (index, dialog) in dialogs.iter().enumerate() {
+                                match dialog {
+                                    DialogContent::Choice { text: _, condition } => {
+                                        match condition {
+                                            Some(cond) => {
+                                                if cond.is_verified(
+                                                    None,
+                                                    Some(active_world_events.active_world_events
+                                                        .iter()
+                                                        .map(|x| x.to_string())
+                                                        .collect::<Vec<String>>())
+                                                ) {
+                                                    possible_choices_index.push(index);
+                                                }
+                                            }
+                                            // no condition
+                                            None => {
+                                                possible_choices_index.push(index);
+                                            }
+                                        }
+                                    }
+                                    _ => panic!(
+                                        "Err: DialogTree Incorrect; A choices' vector contains something else"
+                                    ),
+                                }
+                            }
+                            if let Some(child_index) =
+                                possible_choices_index.choose(&mut rand::thread_rng())
+                            {
+                                dialog_dive_event.send(DialogDiveEvent {
+                                    child_index: *child_index,
+                                    skip: false,
+                                });
+                            } else {
+                                // TODO: if `possible_choices_index.is_empty()`
                             }
                         }
-                        // update the player_panel
-                        *player_panel = PlayerPanel::Choices(choices);
-
-                        // Remove all text which aren't said by the current interlocutor
-                        if current_interlocutor.is_changed() {
-                            npc_panel.texts.clear();
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn update_text_panels(
-    mut npc_panel_query: Query<(&NPCPanel, &mut Text), (Changed<NPCPanel>, Without<PlayerPanel>)>,
-    mut player_panel_query: Query<
-        (&PlayerPanel, &mut Text),
-        (Changed<PlayerPanel>, Without<NPCPanel>),
-    >,
-    mut choice_query: Query<(&Choice, &mut Visibility, &Children)>,
-    mut text_query: Query<&mut Text, (Without<PlayerPanel>, Without<NPCPanel>)>,
-) {
-    for (npc_panel, mut text) in &mut npc_panel_query {
-        text.sections[0].value = match npc_panel.first() {
-            None => String::new(),
-            Some(first) => first.to_string(),
-        };
-    }
-    for (player_panel, mut text) in &mut player_panel_query {
-        match player_panel {
-            PlayerPanel::Texts(texts) => {
-                text.sections[0].value = match texts.first() {
-                    None => String::new(),
-                    Some(first) => first.to_string(),
-                };
-
-                for (_, mut visibility, _) in &mut choice_query {
-                    *visibility = Visibility::Hidden;
-                }
-            }
-            PlayerPanel::Choices(choices) => {
-                text.sections[0].value = String::new();
-
-                for (choice_index, mut visibility, children) in &mut choice_query {
-                    // TODO: Verify condition !
-                    if choice_index.0 < choices.len() {
-                        let mut text = text_query.get_mut(children[0]).unwrap();
-                        text.sections[0].value = choices[choice_index.0].clone();
-                        *visibility = Visibility::Inherited;
-                    } else {
-                        *visibility = Visibility::Hidden;
                     }
                 }
             }
@@ -563,47 +630,93 @@ fn spawn_camera(mut commands: Commands) {
 pub const OLD_FROG_DIALOG: &str = "# Old Frog
 
 - KeroKero
+- I want you to talk with the last Frog. All the way.
 
-## Old Frog
-
-- I want you to talk with the last Frog
-
-### Old Frog
-
-- All the way.
-
-#### Player
+## Player
 
 - Done ? | e: FrogTalk;
 
-##### Old Frog
+### Old Frog
 
 - You have my respect.
-
-##### Old Frog
-
 - Press Reset or alt+f4.\n";
 
 pub const FROG_DIALOG: &str = "# Frog
 
-- KeroKero
+- KeroKero | None
+- Crôaa | None
+- bêêh | None
 
 ## Frog
 
-- I wanted to say you something
+- KeroKero
 
 ### Player
+
+- I wanted to say you something
+
+#### Player
 
 - You = Cool | None
 - You = Not Cool | None
 
-#### Frog
+##### Frog
+
+- Big love on you /<3
+
+-> FrogLove
+
+##### Frog
+
+- I'm sad now.
+
+-> FrogHate
+
+## Frog
+
+- Crôaa
+
+### Player
+
+- I wanted to say you something
+
+#### Player
+
+- You = Cool | None
+- You = Not Cool | None
+
+##### Frog
 
 - Big love on you
 
 -> FrogLove
 
-#### Frog
+##### Frog
+
+- I'm sad now.
+
+-> FrogHate
+
+## Frog
+
+- Bêêh
+
+### Player
+
+- I wanted to say you something
+
+#### Player
+
+- You = Cool | None
+- You = Not Cool | None
+
+##### Frog
+
+- Big love on you
+
+-> FrogLove
+
+##### Frog
 
 - I'm sad now.
 
@@ -612,27 +725,21 @@ pub const FROG_DIALOG: &str = "# Frog
 pub const WARRIOR_DIALOG: &str = "# Warrior Frog
 
 - Hey
-
-## Warrior Frog
-
 - I mean... KeroKero
-
-### Warrior Frog
-
 - Can you bring my love to my homegirl the Frog in the Middle ?
 
-#### Player
+## Player
 
 - Oh Jeez I messed up | e: FrogHate;
 - THe Frog is in love | e: FrogLove;
 
-##### Warrior Frog
+### Warrior Frog
 
 - :0
 
 -> FrogTalk
 
-##### Warrior Frog
+### Warrior Frog
 
 - :)
 
@@ -860,7 +967,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                                     ..default()
                                 },
                                 Name::new("Dialog NPC"),
-                                NPCPanel::default(),
+                                NPCPanel,
                             ));
 
                             parent
@@ -895,7 +1002,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                                         ..default()
                                     },
                                     Name::new("Dialog Player"),
-                                    PlayerPanel::default(),
+                                    PlayerPanel,
                                 ))
                                 .with_children(|parent| {
                                     for i in 0..3 {

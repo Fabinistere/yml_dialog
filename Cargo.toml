@@ -17,6 +17,8 @@ log = "0.4.17"
 bevy = "0.10" #  version = "0.10", git = "https://github.com/bevyengine/bevy", rev="9788b386c7846c99978ab5c1a33698ec5a471d84", default-features = false
 bevy_tweening = "0.7" # 0.8
 
+rand = "0.8.5"
+
 # -- EnumIter --
 strum = "0.17.1"
 strum_macros = "0.17.1"

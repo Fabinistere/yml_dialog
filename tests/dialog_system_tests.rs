@@ -80,14 +80,16 @@ fn test_print_from_file() {
     let fabien = Some(String::from("Fabien"));
     let morgan = Some(String::from("Morgan"));
 
-    let dialog = Rc::new(RefCell::new(DialogNode {
-        dialog_content: vec![DialogContent::Text(String::from("Hello"))],
-        author: fabien.clone(),
-        ..DialogNode::default()
-    }));
+    let dialog = Rc::new(RefCell::new(DialogNode::new(
+        vec![DialogContent::Text(String::from("Hello"))],
+        fabien.clone(),
+        Vec::new(),
+        None,
+        Vec::new(),
+    )));
 
-    let answers = Rc::new(RefCell::new(DialogNode {
-        dialog_content: vec![
+    let answers = Rc::new(RefCell::new(DialogNode::new(
+        vec![
             DialogContent::Choice {
                 text: String::from("Hey"),
                 condition: None,
@@ -101,27 +103,35 @@ fn test_print_from_file() {
                 condition: None,
             },
         ],
-        author: morgan,
-        ..DialogNode::default()
-    }));
+        morgan,
+        Vec::new(),
+        None,
+        Vec::new(),
+    )));
 
-    let dialog_2 = Rc::new(RefCell::new(DialogNode {
-        dialog_content: vec![DialogContent::Text(String::from(":)"))],
-        author: fabien.clone(),
-        ..DialogNode::default()
-    }));
+    let dialog_2 = Rc::new(RefCell::new(DialogNode::new(
+        vec![DialogContent::Text(String::from(":)"))],
+        fabien.clone(),
+        Vec::new(),
+        None,
+        Vec::new(),
+    )));
 
-    let dialog_3 = Rc::new(RefCell::new(DialogNode {
-        dialog_content: vec![DialogContent::Text(String::from(":O"))],
-        author: fabien.clone(),
-        ..DialogNode::default()
-    }));
+    let dialog_3 = Rc::new(RefCell::new(DialogNode::new(
+        vec![DialogContent::Text(String::from(":O"))],
+        fabien.clone(),
+        Vec::new(),
+        None,
+        Vec::new(),
+    )));
 
-    let dialog_4 = Rc::new(RefCell::new(DialogNode {
-        dialog_content: vec![DialogContent::Text(String::from("Sure"))],
-        author: fabien.clone(),
-        ..DialogNode::default()
-    }));
+    let dialog_4 = Rc::new(RefCell::new(DialogNode::new(
+        vec![DialogContent::Text(String::from("Sure"))],
+        fabien.clone(),
+        Vec::new(),
+        None,
+        Vec::new(),
+    )));
 
     answers.borrow_mut().add_child(dialog_2);
     answers.borrow_mut().add_child(dialog_3);
@@ -234,10 +244,10 @@ fn test_init_tree_from_file_simple_text_1() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Olf")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Olf")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![DialogContent::Text("Hello".to_string())]
     );
 }
@@ -257,10 +267,10 @@ fn test_init_tree_from_file_space_overdose_1() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Olf")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Olf")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![DialogContent::Text("Hello".to_string())]
     );
 }
@@ -280,10 +290,10 @@ fn test_init_tree_from_file_space_overdose_2() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Choice {
                 text: "Hello".to_string(),
@@ -312,10 +322,10 @@ fn test_init_tree_from_file_space_deficiency_1() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Olf")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Olf")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![DialogContent::Text("Hello".to_string())]
     );
 }
@@ -335,10 +345,10 @@ fn test_init_tree_from_file_space_deficiency_2() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Choice {
                 text: "Hello".to_string(),
@@ -367,10 +377,10 @@ fn test_init_tree_from_file_monologue_1() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Text("Hello".to_string()),
             DialogContent::Text("I was wondering".to_string()),
@@ -394,10 +404,10 @@ fn test_init_tree_from_file_simple_choice_1() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Choice {
                 text: "Hello".to_string(),
@@ -426,10 +436,10 @@ fn test_init_tree_from_file_complex_choice_1() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Choice {
                 text: "Hello".to_string(),
@@ -458,10 +468,10 @@ fn test_init_tree_from_file_complex_choice_2() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Choice {
                 text: "Hello".to_string(),
@@ -496,10 +506,10 @@ fn test_init_tree_from_file_complex_choice_3() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Choice {
                 text: "Hello".to_string(),
@@ -527,10 +537,10 @@ fn test_init_tree_from_file_complex_choice_4() {
                     .collect::<Vec<String>>(),
     ));
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Choice {
                 text: "Hello my Friend".to_string(),
@@ -567,10 +577,10 @@ fn test_init_tree_from_file_complex_choice_event_with_k() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Choice {
                 text: "KeroKero".to_string(),
@@ -603,10 +613,10 @@ fn test_init_tree_from_file_complex_choice_karma_max_min() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Choice {
                 text: "Hello".to_string(),
@@ -635,18 +645,18 @@ fn test_init_tree_from_file_simple_kinship_1() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
     assert_eq!(
-        root.borrow().children[0].borrow().author,
+        *root.borrow().children()[0].borrow().author(),
         Some(String::from("Hugo"))
     );
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![DialogContent::Text("Hello".to_string())]
     );
     assert_eq!(
-        root.borrow().children[0].borrow().dialog_content,
+        *root.borrow().children()[0].borrow().content(),
         vec![DialogContent::Text("Hey! How are you ?".to_string())]
     );
 }
@@ -663,10 +673,10 @@ fn test_init_tree_from_file_monologue_2() {
         .collect::<Vec<String>>(),
 ));
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Text("Hello".to_string()),
             DialogContent::Text("I was wondering".to_string())
@@ -674,12 +684,12 @@ fn test_init_tree_from_file_monologue_2() {
     );
 
     assert_eq!(
-        root.borrow().children[0].borrow().author,
+        *root.borrow().children()[0].borrow().author(),
         Some(String::from("Morgan"))
     );
 
     assert_eq!(
-        root.borrow().children[0].borrow().dialog_content,
+        *root.borrow().children()[0].borrow().content(),
         vec![
             DialogContent::Choice {
                 text: "With Friends !".to_string(),
@@ -710,9 +720,9 @@ fn test_init_tree_from_file_complex_kinship_1() {
         .collect::<Vec<String>>(),
 ));
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Choice {
                 text: "Hello".to_string(),
@@ -730,20 +740,20 @@ fn test_init_tree_from_file_complex_kinship_1() {
     // By choosing the n-eme choice, you will get the result of the n-eme child.
 
     assert_eq!(
-        root.borrow().children[0].borrow().author,
+        *root.borrow().children()[0].borrow().author(),
         Some(String::from("Hugo"))
     );
     assert_eq!(
-        root.borrow().children[0].borrow().dialog_content,
+        *root.borrow().children()[0].borrow().content(),
         vec![DialogContent::Text("Hey! How are you ?".to_string())]
     );
 
     assert_eq!(
-        root.borrow().children[1].borrow().author,
+        *root.borrow().children()[1].borrow().author(),
         Some(String::from("Hugo"))
     );
     assert_eq!(
-        root.borrow().children[1].borrow().dialog_content,
+        *root.borrow().children()[1].borrow().content(),
         vec![DialogContent::Text(
             "I'm sure you'll do just fine without me.".to_string()
         )]
@@ -767,9 +777,9 @@ fn test_init_tree_from_file_throwable_event_1() {
             )
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![
             DialogContent::Choice {
                 text: "Let's Talk".to_string(),
@@ -788,29 +798,29 @@ fn test_init_tree_from_file_throwable_event_1() {
 
     // first child
     assert_eq!(
-        root.borrow().children[0].borrow().author,
+        *root.borrow().children()[0].borrow().author(),
         Some(String::from("Hugo"))
     );
     assert_eq!(
-        root.borrow().children[0].borrow().dialog_content,
+        *root.borrow().children()[0].borrow().content(),
         vec![DialogContent::Text(":)".to_string())]
     );
     assert_eq!(
-        root.borrow().children[0].borrow().trigger_event,
+        *root.borrow().children()[0].borrow().trigger_event(),
         vec![TriggerEvent::HasFriend.to_string()]
     );
 
     // second child
     assert_eq!(
-        root.borrow().children[1].borrow().author,
+        *root.borrow().children()[1].borrow().author(),
         Some(String::from("Hugo"))
     );
     assert_eq!(
-        root.borrow().children[1].borrow().dialog_content,
+        *root.borrow().children()[1].borrow().content(),
         vec![DialogContent::Text(":(".to_string())]
     );
     assert_eq!(
-        root.borrow().children[1].borrow().trigger_event,
+        *root.borrow().children()[1].borrow().trigger_event(),
         vec![TriggerEvent::FightEvent.to_string()]
     );
 }
@@ -832,10 +842,10 @@ fn test_init_tree_from_file_except_1() {
         ),
     );
 
-    assert_eq!(root.borrow().author, Some(String::from("Morgan")));
+    assert_eq!(*root.borrow().author(), Some(String::from("Morgan")));
 
     assert_eq!(
-        root.borrow().dialog_content,
+        *root.borrow().content(),
         vec![DialogContent::Text(
             "Bonjour Florian. \nComment vas-tu :# ? \nJ'ai faim. <3 <|3".to_string()
         )]
@@ -847,7 +857,7 @@ fn test_init_tree_from_file_except_1() {
 //     let root = init_tree_flat(String::from("[0,1,[3,4,5,[7,8]],2]"));
 //     let new_node = Rc::new(RefCell::new(TreeNode::new()));
 //     new_node.borrow_mut().value = Some(9);
-//     let child = &root.borrow().children[2];
+//     let child = &*root.borrow().children()[2];
 //     child.borrow_mut().add_child(new_node);
 //     assert_eq!(root.borrow().print_flat(), "[0,1,[3,4,5,[7,8],9],2]");
 // }

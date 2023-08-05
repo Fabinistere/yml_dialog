@@ -1133,7 +1133,7 @@ mod dialog_panel {
 
                 let current = &dialog_tree.borrow();
 
-                let dialogs = &current.dialog_content;
+                let dialogs = &current.content();
 
                 let (mut player_scroll, _player_scroll_entity) = player_scroll_query.single_mut();
 
@@ -1175,7 +1175,7 @@ mod dialog_panel {
                                 match condition {
                                     Some(cond) => {
                                         let (_player, karma) = player_query.single();
-                                        if cond.is_verified(karma.0) {
+                                        if cond.is_verified(Some(karma.0), None) {
                                             choices.push(text.to_owned());
                                             info!("DEBUG: add choice: {}", text);
                                         }
@@ -1480,7 +1480,7 @@ mod dialog_player {
                         // **the rule implied not**
                         // cause a text must have one child or none
 
-                        let child = dialog_tree.borrow().children[*child_index]
+                        let child = dialog_tree.borrow().children()[*child_index]
                             .borrow()
                             .print_file();
 
@@ -1566,15 +1566,15 @@ mod dialog_player {
             // TOTEST: calling this event mean the scroll do exist but maybe not ?
             let (mut upper_scroll, _upper_scroll_entity) = upper_scroll_query.single_mut();
 
-            if let Some((_first, rem)) = upper_scroll.texts.split_first() {
-                // pop first only
-                upper_scroll.texts = rem.to_vec();
+            match upper_scroll.texts.split_first() {
+                None => warn!("The UpperScroll does not contain text"),
+                Some((_first, rem)) => {
+                    // pop first only
+                    upper_scroll.texts = rem.to_vec();
 
-                // ask to update the content of scroll (which will update the DialogBox)
-                scroll_event.send(UpdateScrollEvent);
-            } else {
-                // shouldn't be the case
-                warn!("The UpperScroll does not contain text")
+                    // ask to update the content of scroll (which will update the DialogBox)
+                    scroll_event.send(UpdateScrollEvent);
+                }
             }
         }
     }
