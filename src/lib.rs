@@ -243,26 +243,176 @@ impl DialogNode {
     /// # Return
     ///
     /// `true` if the type of the first element (of dialog_content) is choice
+    ///
+    /// ```rust
+    /// let answers = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Choice {
+    ///             text: String::from("Hello"),
+    ///             condition: None,
+    ///         },
+    ///         DialogContent::Choice {
+    ///             text: String::from("No Hello"),
+    ///             condition: None,
+    ///         },
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     Vec::new(),
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// assert!(answers.is_choice())
+    /// ```
     pub fn is_choice(&self) -> bool {
-        if !self.dialog_content.is_empty() {
-            return self.dialog_content[0].is_choice();
+        match self.dialog_content.first() {
+            None => false,
+            Some(first) => first.is_choice(),
         }
-        false
     }
 
     /// # Return
     ///
     /// `true` if the type of the first element (of dialog_content) is choice
+    ///
+    /// ```rust
+    /// let catchphrase = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Text(String::from("Hello")),
+    ///         DialogContent::Text(String::from("How are you?")),
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     Vec::new(),
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// assert!(answers.is_choice())
+    /// ```
     pub fn is_text(&self) -> bool {
-        if !self.dialog_content.is_empty() {
-            return self.dialog_content[0].is_text();
+        match self.dialog_content.first() {
+            None => false,
+            Some(first) => first.is_text(),
         }
-        false
     }
 
     /// Put `new_node` in the end of the children vector.
     pub fn add_child(&mut self, new_node: Rc<RefCell<DialogNode>>) {
         self.children.push(new_node);
+    }
+
+    /// TEMP: If the children is a choice and if there is at least one verified choice
+    ///
+    /// ```rust
+    /// # use std::{rc::Rc, cell::RefCell};
+    /// # use fto_dialog::{DialogNode, DialogContent};
+    /// let answers = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Choice {
+    ///             text: String::from("Hello"),
+    ///             condition: None,
+    ///         },
+    ///         DialogContent::Choice {
+    ///             text: String::from("No Hello"),
+    ///             condition: None,
+    ///         },
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     Vec::new(),
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// let catchphrase = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Text(String::from("Hello")),
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     vec![Rc::new(RefCell::new(answers))],
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// assert!(catchphrase.at_least_one_child_is_verified(None, None))
+    /// ```
+    ///
+    /// ```rust
+    /// # use std::{rc::Rc, cell::RefCell};
+    /// # use fto_dialog::{DialogNode, DialogContent};
+    /// let answer = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Text(String::from("No, you're cool"))
+    ///     ],
+    ///     Some("Not You".to_string()),
+    ///     Vec::new(),
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// let catchphrase = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Text(String::from("Hello CoolFolk")),
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     vec![Rc::new(RefCell::new(answer))],
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// assert!(catchphrase.at_least_one_child_is_verified(None, None))
+    /// ```
+    ///
+    /// ```rust
+    /// # use std::{rc::Rc, cell::RefCell};
+    /// # use fto_dialog::{DialogNode, DialogContent, DialogCondition};
+    /// let answers = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Choice {
+    ///             text: String::from("Hello"),
+    ///             condition: Some(DialogCondition::new(Some((50, 100)), None)),
+    ///         },
+    ///         DialogContent::Choice {
+    ///             text: String::from("No Hello"),
+    ///             condition: Some(DialogCondition::new(Some((-50, 0)), None)),
+    ///         },
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     Vec::new(),
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// let catchphrase = DialogNode::new(
+    ///     vec![
+    ///         DialogContent::Text(String::from("Hello")),
+    ///     ],
+    ///     Some("You".to_string()),
+    ///     vec![Rc::new(RefCell::new(answers))],
+    ///     None,
+    ///     Vec::new(),
+    /// );
+    ///
+    /// assert!(!catchphrase.at_least_one_child_is_verified(Some(20), None))
+    /// ```
+    pub fn at_least_one_child_is_verified(
+        &self,
+        karma: Option<i32>,
+        events: Option<Vec<String>>,
+    ) -> bool {
+        for child in &self.children {
+            for content in child.borrow().content() {
+                match content {
+                    DialogContent::Text(_) => return true,
+                    DialogContent::Choice { text: _, condition } => {
+                        return match condition {
+                            None => true,
+                            Some(condition) => condition.is_verified(karma, events),
+                        };
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Give the read-only author of the node.

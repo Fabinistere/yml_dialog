@@ -231,7 +231,6 @@ fn continue_dialog(
                 skip: true,
             });
         }
-        // break;
     }
 }
 
@@ -276,6 +275,7 @@ fn trigger_event_handler(
 fn dialog_dive(
     mut dialog_dive_event: EventReader<DialogDiveEvent>,
     current_interlocutor: Res<CurrentInterlocutor>,
+    active_world_events: Res<ActiveWorldEvents>,
     mut dialog_query: Query<&mut Dialog, With<Portrait>>,
 
     mut trigger_event: EventWriter<TriggerEvents>,
@@ -290,6 +290,8 @@ fn dialog_dive(
                 match &dialog.current_node {
                     None => {}
                     Some(current_node_string) => {
+                        // println!("DEBUG: \n{}", dialog.current_node.clone().unwrap());
+
                         let dialog_tree = init_tree_file(
                             current_node_string.to_string(),
                             DialogCustomInfos::new(
@@ -305,7 +307,6 @@ fn dialog_dive(
 
                         let mut current_node = dialog_tree.borrow_mut();
 
-                        // mut?
                         match current_node.content().split_first() {
                             None => {}
                             Some((first, rem)) => {
@@ -317,9 +318,28 @@ fn dialog_dive(
                                             Some(current_node.print_file())
                                         } else if current_node.is_end_node() {
                                             info!("clear dialog panel");
+                                            trigger_event.send(TriggerEvents(
+                                                current_node.trigger_event().to_vec(),
+                                            ));
                                             None
+                                        }
+                                        // there is not one choice verified nor a text: don't overwrite the current_node to let the last npc sentence
+                                        else if !current_node.at_least_one_child_is_verified(
+                                            None,
+                                            Some(
+                                                active_world_events
+                                                    .active_world_events
+                                                    .iter()
+                                                    .map(|x| x.to_string())
+                                                    .collect::<Vec<String>>(),
+                                            ),
+                                        ) {
+                                            // no change if this node is still a dead end (even with children)
+                                            dialog.current_node.clone()
                                         } else {
-                                            // TODO: if verify and there is not one choice verified: don't overwrite the current_node to let the last npc sentence
+                                            trigger_event.send(TriggerEvents(
+                                                current_node.trigger_event().to_vec(),
+                                            ));
                                             // DOC: Specifics Rules link - Children (Text/Choice)
                                             Some(
                                                 current_node.children()[*child_index]
@@ -327,12 +347,6 @@ fn dialog_dive(
                                                     .print_file(),
                                             )
                                         };
-
-                                        if current_node.content().len() <= 1 {
-                                            trigger_event.send(TriggerEvents(
-                                                current_node.trigger_event().to_vec(),
-                                            ));
-                                        }
                                     }
                                     DialogContent::Choice {
                                         text: _,
@@ -359,6 +373,7 @@ fn dialog_dive(
                                 }
                             }
                         };
+                        // println!("DEBUG: \n{}", dialog.current_node.clone().unwrap());
                     }
                 }
             }
@@ -615,7 +630,7 @@ fn spawn_camera(mut commands: Commands) {
 pub const OLD_FROG_DIALOG: &str = "# Old Frog
 
 - KeroKero
-- I want you to talk with the last Frog.\\nAll the way.
+- I want you to talk with the last Frog. All the way.
 
 ## Player
 
@@ -647,7 +662,7 @@ pub const FROG_DIALOG: &str = "# Frog
 
 ##### Frog
 
-- Big love on you
+- Big love on you /<3
 
 -> FrogLove
 
