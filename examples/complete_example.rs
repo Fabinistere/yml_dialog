@@ -13,7 +13,7 @@ use bevy::{
     winit::WinitSettings,
 };
 use rand::seq::SliceRandom;
-use std::fmt;
+use std::{fmt, str::FromStr};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -57,6 +57,19 @@ impl fmt::Display for WorldEvent {
             WorldEvent::FrogLove => write!(f, "FrogLove"),
             WorldEvent::FrogHate => write!(f, "FrogHate"),
             WorldEvent::FrogTalk => write!(f, "FrogTalk"),
+        }
+    }
+}
+
+impl FromStr for WorldEvent {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<WorldEvent, Self::Err> {
+        match input {
+            "FrogTalk" => Ok(WorldEvent::FrogTalk),
+            "FrogLove" => Ok(WorldEvent::FrogLove),
+            "FrogHate" => Ok(WorldEvent::FrogHate),
+            _ => Err(()),
         }
     }
 }
@@ -132,6 +145,7 @@ fn main() {
         .insert_resource(CurrentInterlocutor::default())
         .insert_resource(ActiveWorldEvents::default())
         .add_event::<DialogDiveEvent>()
+        .add_event::<TriggerEvents>()
         .add_startup_systems((setup, spawn_camera))
         .add_systems((
             continue_dialog,
@@ -140,6 +154,7 @@ fn main() {
             switch_dialog,
             dialog_dive,
             update_dialog_panel,
+            trigger_event_handler.after(dialog_dive),
             change_interlocutor_portrait,
             button_system,
             // button_visibility,
@@ -149,6 +164,7 @@ fn main() {
 }
 
 fn reset_system(
+    mut active_world_events: ResMut<ActiveWorldEvents>,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<Reset>, With<Button>)>,
     mut dialog_query: Query<&mut Dialog, With<Portrait>>,
 ) {
@@ -157,6 +173,7 @@ fn reset_system(
             for mut dialog in &mut dialog_query {
                 dialog.current_node = dialog.root.clone()
             }
+            active_world_events.clear();
         }
     }
 }
@@ -218,6 +235,34 @@ fn continue_dialog(
     }
 }
 
+/// Happens when
+///   - `dialog_dive()`
+///     - when leaving a node
+///
+/// Read in
+///   - `trigger_event_handler()`
+///     - If the event is not already active
+///     add it to the WorldEvent list.
+struct TriggerEvents(Vec<String>);
+
+fn trigger_event_handler(
+    mut trigger_event: EventReader<TriggerEvents>,
+    mut active_world_events: ResMut<ActiveWorldEvents>,
+) {
+    for TriggerEvents(incomming_events) in trigger_event.iter() {
+        for event_to_trigger in incomming_events {
+            match WorldEvent::from_str(&event_to_trigger) {
+                Err(_) => {}
+                Ok(event) => {
+                    if !active_world_events.contains(&event) {
+                        active_world_events.push(event)
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Analyze the current node;
 ///
 /// If not empty,
@@ -232,6 +277,8 @@ fn dialog_dive(
     mut dialog_dive_event: EventReader<DialogDiveEvent>,
     current_interlocutor: Res<CurrentInterlocutor>,
     mut dialog_query: Query<&mut Dialog, With<Portrait>>,
+
+    mut trigger_event: EventWriter<TriggerEvents>,
 ) {
     for DialogDiveEvent { child_index, skip } in dialog_dive_event.iter() {
         // info!("DEBUG: DialogDive Event");
@@ -270,10 +317,8 @@ fn dialog_dive(
                                             Some(current_node.print_file())
                                         } else if current_node.is_end_node() {
                                             info!("clear dialog panel");
-                                            // TODO: Trigger Event
                                             None
                                         } else {
-                                            // TODO: if verifying: feat TriggerEvent
                                             // TODO: if verify and there is not one choice verified: don't overwrite the current_node to let the last npc sentence
                                             // DOC: Specifics Rules link - Children (Text/Choice)
                                             Some(
@@ -282,6 +327,12 @@ fn dialog_dive(
                                                     .print_file(),
                                             )
                                         };
+
+                                        if current_node.content().len() <= 1 {
+                                            trigger_event.send(TriggerEvents(
+                                                current_node.trigger_event().to_vec(),
+                                            ));
+                                        }
                                     }
                                     DialogContent::Choice {
                                         text: _,
@@ -301,6 +352,9 @@ fn dialog_dive(
                                                     .print_file(),
                                             )
                                         };
+                                        trigger_event.send(TriggerEvents(
+                                            current_node.trigger_event().to_vec(),
+                                        ));
                                     }
                                 }
                             }

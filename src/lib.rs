@@ -208,6 +208,27 @@ pub struct DialogNode {
 }
 
 impl DialogNode {
+    /// COnstructs a new DialogNode with the given
+    /// - `content`,
+    /// - `author`,
+    /// - `children`,
+    /// - `parent`
+    /// - `trigger_event`
+    pub fn new(
+        content: Vec<DialogContent>,
+        author: Option<String>,
+        children: Vec<Rc<RefCell<DialogNode>>>,
+        parent: Option<Rc<RefCell<DialogNode>>>,
+        trigger_event: Vec<String>,
+    ) -> Self {
+        DialogNode {
+            dialog_content: content,
+            author,
+            children,
+            parent,
+            trigger_event,
+        }
+    }
     // pub fn is_empty(&self) -> bool {
     //     self.dialog_content.is_empty()
     // }
