@@ -14,6 +14,7 @@
 Accordingly to this [discussion](https://github.com/bevyengine/bevy/discussions/1202),
 this is not a trivial question.
 
+- yml-dialog
 - md-to-dialog-tree
 - fto-dialog
 - bevy_dialog
