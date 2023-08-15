@@ -15,10 +15,10 @@
 
 use log::warn;
 use serde::{
-    ser::{SerializeStruct, SerializeStructVariant, Serializer},
-    Deserialize, Serialize,
+    // ser::{SerializeStruct, SerializeStructVariant, Serializer},
+    Deserialize,
+    Serialize,
 };
-use std::collections::BTreeMap;
 
 /// This correspond to a unique key
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
@@ -26,6 +26,7 @@ use std::collections::BTreeMap;
 pub struct DialogNodeYML {
     source: String,
     content: Content,
+    /// REFACTOR: Turn this into a generic type `extra`
     trigger_event: Vec<String>,
 }
 
@@ -40,6 +41,36 @@ impl DialogNodeYML {
             content,
             trigger_event,
         }
+    }
+
+    /// Give the read-only author of the node.
+    pub fn source(&self) -> &String {
+        &self.source
+    }
+
+    /// Give the mutable author of the node.
+    pub fn source_mut(&mut self) -> &mut String {
+        &mut self.source
+    }
+
+    /// Give the read-only `content` of the node.
+    pub fn content(&self) -> &Content {
+        &self.content
+    }
+
+    /// Give the mutable `content` of the node.
+    pub fn content_mut(&mut self) -> &mut Content {
+        &mut self.content
+    }
+
+    /// Give the read-only `trigger_event` of the node.
+    pub fn trigger_event(&self) -> &Vec<String> {
+        &self.trigger_event
+    }
+
+    /// Give the mutable trigger_event of the node.
+    pub fn trigger_event_mut(&mut self) -> &mut Vec<String> {
+        &mut self.trigger_event
     }
 }
 
@@ -186,6 +217,44 @@ impl Choice {
             exit_state,
         }
     }
+
+    /// Retruns the bool: The choice's condition is verified with the given `karma` and the set of `active_event`
+    pub fn is_verified(&self, karma: Option<i32>, active_events: Vec<String>) -> bool {
+        match &self.condition {
+            None => self.condition.is_none(),
+            Some(condition) => condition.is_verified(karma, active_events),
+        }
+    }
+
+    /// Returns the read-only `text` of the choice
+    pub fn text(&self) -> &String {
+        &self.text
+    }
+
+    /// Returns the mutable `text` of the choice
+    pub fn text_mut(&mut self) -> &mut String {
+        &mut self.text
+    }
+
+    /// Returns the read-only `condition` of the choice
+    pub fn condition(&self) -> &Option<Condition> {
+        &self.condition
+    }
+
+    /// Returns the mutable `condition` of the choice
+    pub fn condition_mut(&mut self) -> &mut Option<Condition> {
+        &mut self.condition
+    }
+
+    /// Returns the read-only `exit_state` of the choice
+    pub fn exit_state(&self) -> &usize {
+        &self.exit_state
+    }
+
+    /// Returns the mutable `exit_state` of the choice
+    pub fn exit_state_mut(&mut self) -> &mut usize {
+        &mut self.exit_state
+    }
 }
 
 // impl Serialize for Choice {
@@ -235,10 +304,10 @@ impl Condition {
     /// # Note
     ///
     /// NOTE: Could be depreciated to only use `is_verified`
-    pub fn is_events_verified(&self, events: Vec<String>) -> bool {
+    pub fn is_events_verified(&self, active_events: Vec<String>) -> bool {
         let mut all_contained = true;
         for event in self.events() {
-            if !events.contains(event) {
+            if !active_events.contains(event) {
                 all_contained = false;
                 break;
             }
@@ -246,13 +315,13 @@ impl Condition {
         all_contained
     }
 
-    /// Verify a Choice's condition
-    pub fn is_verified(&self, karma: Option<i32>, events: Vec<String>) -> bool {
+    /// Verify a Choice's condition with the potential tested karma and the set of active event
+    pub fn is_verified(&self, karma: Option<i32>, active_events: Vec<String>) -> bool {
         let karma_verified = match karma {
-            None => self.karma_threshold == None,
+            None => self.karma_threshold.is_none(),
             Some(karma) => self.is_karma_verified(karma),
         };
-        let events_verified = self.is_events_verified(events);
+        let events_verified = self.is_events_verified(active_events);
 
         karma_verified && events_verified
     }
@@ -276,32 +345,4 @@ impl Condition {
     pub fn events_mut(&mut self) -> &Vec<String> {
         &mut self.events
     }
-}
-
-/// The generic Type `C` corresponds to your custom struct Condition.
-///
-/// ```rust
-/// use std::collections::BTreeMap;
-///
-/// fn main() -> Result<(), serde_yaml::Error> {
-///     // You have some type.
-///     let mut map = BTreeMap::new();
-///     map.insert("x".to_string(), 1.0);
-///     map.insert("y".to_string(), 2.0);
-///
-///     // Serialize it to a YAML string.
-///     let yaml = serde_yaml::to_string(&map)?;
-///     assert_eq!(yaml, "x: 1.0\ny: 2.0\n");
-///
-///     // Deserialize it back to a Rust type.
-///     let deserialized_map: BTreeMap<String, f64> = serde_yaml::from_str(&yaml)?;
-///     assert_eq!(map, deserialized_map);
-///     Ok(())
-/// }
-/// ```
-pub fn dialog_deserializer(
-    dialog_file: String,
-) -> Result<BTreeMap<usize, DialogNodeYML>, serde_yaml::Error> {
-    let deserialized_map: BTreeMap<usize, DialogNodeYML> = serde_yaml::from_str(&dialog_file)?;
-    Ok(deserialized_map)
 }

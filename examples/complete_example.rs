@@ -13,11 +13,9 @@ use bevy::{
     winit::WinitSettings,
 };
 use rand::seq::SliceRandom;
-use std::{fmt, str::FromStr};
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
+use std::{collections::BTreeMap, fmt, str::FromStr};
 
-use fto_dialog::{init_tree_file, DialogContent, DialogCustomInfos};
+use fto_dialog::{Content, DialogNodeYML};
 
 // dark purple #25131a = 39/255, 19/255, 26/255
 const CLEAR: bevy::render::color::Color = bevy::render::color::Color::rgb(0.153, 0.07, 0.102);
@@ -44,7 +42,7 @@ struct ActiveWorldEvents {
     active_world_events: Vec<WorldEvent>,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, EnumIter)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 enum WorldEvent {
     FrogLove,
     FrogHate,
@@ -74,30 +72,23 @@ impl FromStr for WorldEvent {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default, Component)]
-struct Dialog {
-    root: Option<String>,
-    current_node: Option<String>,
-}
+/// - `key`: interlocutor
+/// - `value`: (current state, BinaryTreeMap of the dialog)
+#[derive(Debug, Deref, DerefMut, Default, Resource)]
+struct DialogMap(BTreeMap<Entity, (usize, BTreeMap<usize, DialogNodeYML>)>);
 
-impl Dialog {
-    fn all(root: Option<String>) -> Self {
-        Dialog {
-            root: root.clone(),
-            current_node: root,
-        }
-    }
-
-    // fn root(&self) -> Option<String> {
-    //     self.root.clone()
-    // }
-
-    // fn set_current(&mut self, current_node: Option<String>) {
-    //     self.current_node = current_node
-    // }
+/// Contains all the line of the current monolog
+///
+/// Help us keep the `DialogMap` unchanged
+#[derive(Debug, Reflect, Clone, Default, Resource)]
+struct Monolog {
+    source: String,
+    texts: Vec<String>,
 }
 
 /// Points to a interactable portrait.
+///
+/// REFACTOR: remove all the `Dialog` Component
 #[derive(Component)]
 struct Portrait;
 
@@ -105,11 +96,21 @@ struct Portrait;
 #[derive(Component)]
 struct InterlocutorPortait;
 
-/// Contains the index of the choice.
-#[derive(
-    Debug, Reflect, Deref, DerefMut, PartialEq, Eq, PartialOrd, Ord, Clone, Default, Component,
-)]
-struct Choice(usize);
+/// Contains the state number of the choice: `exit_state` and its position in the ui.
+#[derive(Debug, Reflect, PartialEq, Eq, PartialOrd, Ord, Clone, Default, Component)]
+struct ButtonChoice {
+    exit_state: usize,
+    ui_posiiton: usize,
+}
+
+impl ButtonChoice {
+    fn new(ui_posiiton: usize) -> Self {
+        ButtonChoice {
+            exit_state: usize::default(),
+            ui_posiiton,
+        }
+    }
+}
 
 #[derive(Component)]
 struct Reset;
@@ -144,17 +145,20 @@ fn main() {
         )
         .insert_resource(CurrentInterlocutor::default())
         .insert_resource(ActiveWorldEvents::default())
-        .add_event::<DialogDiveEvent>()
+        .insert_resource(DialogMap::default())
+        .insert_resource(Monolog::default())
+        .add_event::<ChangeStateEvent>()
         .add_event::<TriggerEvents>()
         .add_startup_systems((setup, spawn_camera))
         .add_systems((
-            continue_dialog,
+            continue_monolog,
             choose_answer,
             reset_system,
             switch_dialog,
-            dialog_dive,
+            change_dialog_state,
             update_dialog_panel,
-            trigger_event_handler.after(dialog_dive),
+            update_monolog,
+            trigger_event_handler.after(change_dialog_state),
             change_interlocutor_portrait,
             button_system,
             // button_visibility,
@@ -165,13 +169,15 @@ fn main() {
 
 fn reset_system(
     mut active_world_events: ResMut<ActiveWorldEvents>,
+    mut dialogs: ResMut<DialogMap>,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<Reset>, With<Button>)>,
-    mut dialog_query: Query<&mut Dialog, With<Portrait>>,
 ) {
     if let Ok(interaction) = interaction_query.get_single() {
         if *interaction == Interaction::Clicked {
-            for mut dialog in &mut dialog_query {
-                dialog.current_node = dialog.root.clone()
+            for (_key, (current_state, dialog)) in dialogs.iter_mut() {
+                if let Some(lower_state) = dialog.first_entry() {
+                    *current_state = *lower_state.key()
+                }
             }
             active_world_events.clear();
         }
@@ -181,58 +187,41 @@ fn reset_system(
 fn switch_dialog(
     mut interaction_query: Query<(Entity, &Interaction), (Changed<Interaction>, With<Portrait>)>,
     mut current_interlocutor: ResMut<CurrentInterlocutor>,
+    mut current_monolog: ResMut<Monolog>,
 ) {
     for (portrait, interaction) in &mut interaction_query {
         if *interaction == Interaction::Clicked {
             // info!("Switch Interlocutor");
             current_interlocutor.interlocutor = Some(portrait);
+            current_monolog.texts.clear();
+            current_monolog.source.clear();
         }
     }
 }
 
 fn choose_answer(
-    choice_query: Query<(&Choice, &Interaction), Changed<Interaction>>,
-    mut dialog_dive_event: EventWriter<DialogDiveEvent>,
+    choice_query: Query<(&ButtonChoice, &Interaction), Changed<Interaction>>,
+    mut change_state_event: EventWriter<ChangeStateEvent>,
 ) {
-    for (choice_index, interaction) in &choice_query {
+    for (button_infos, interaction) in &choice_query {
         if *interaction == Interaction::Clicked {
-            dialog_dive_event.send(DialogDiveEvent {
-                child_index: **choice_index,
-                skip: false,
-            });
+            change_state_event.send(ChangeStateEvent(button_infos.exit_state))
         }
     }
 }
 
 /// Happens when
-///   - `continue_dialog()`
-///     - any key pressed
+///   - `continue_monolog()`
+///     - any key pressed in a monolog
 ///
 /// Read in
-///   - `dialog_dive()`
+///   - `change_dialog_state()`
 ///     - analyze the current node;
-///     If not empty,
-///       - drop until there is 1 or less text in the UpeerScroll
-///       OR
-///       - go down to the correct child index
-pub struct DialogDiveEvent {
-    pub child_index: usize,
-    pub skip: bool,
-}
-
-fn continue_dialog(
-    mut key_evr: EventReader<KeyboardInput>,
-    mut dialog_dive_event: EventWriter<DialogDiveEvent>,
-) {
-    for ev in key_evr.iter() {
-        if ev.state == ButtonState::Pressed {
-            dialog_dive_event.send(DialogDiveEvent {
-                child_index: 0,
-                skip: true,
-            });
-        }
-    }
-}
+///     If the state asked is a `Content::Choice`
+///     without any choice verified it won't transit to the new state.
+///     Else transit and throw all trigger events,
+///     while leaving the `current_node`.
+struct ChangeStateEvent(usize);
 
 /// Happens when
 ///   - `dialog_dive()`
@@ -250,7 +239,7 @@ fn trigger_event_handler(
 ) {
     for TriggerEvents(incomming_events) in trigger_event.iter() {
         for event_to_trigger in incomming_events {
-            match WorldEvent::from_str(&event_to_trigger) {
+            match WorldEvent::from_str(event_to_trigger) {
                 Err(_) => {}
                 Ok(event) => {
                     if !active_world_events.contains(&event) {
@@ -262,119 +251,117 @@ fn trigger_event_handler(
     }
 }
 
+fn continue_monolog(
+    mut key_evr: EventReader<KeyboardInput>,
+    mut current_monolog: ResMut<Monolog>,
+    current_interlocutor: Res<CurrentInterlocutor>,
+    dialogs: Res<DialogMap>,
+
+    mut change_state_event: EventWriter<ChangeStateEvent>,
+) {
+    for ev in key_evr.iter() {
+        if ev.state == ButtonState::Pressed {
+            if current_monolog.texts.len() > 1 {
+                if let Some((_first, rem)) = current_monolog.texts.split_first() {
+                    current_monolog.texts = rem.to_vec();
+                }
+            } else {
+                match current_interlocutor.interlocutor {
+                    None => {}
+                    Some(interlocutor) => {
+                        if let Some(&(current_state, ref dialog)) = dialogs.get(&interlocutor) {
+                            if let Some(current_node) = dialog.get(&current_state) {
+                                match current_node.content() {
+                                    Content::Choices(_) => {}
+                                    Content::Monolog {
+                                        text: _,
+                                        exit_state,
+                                    } => change_state_event.send(ChangeStateEvent(*exit_state)),
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Analyze the current node;
 ///
-/// If not empty,
-/// - drop until there is 1 or less text
-/// - go down to the correct child index
-///
-/// # Note
-///
-/// Every modification of the DialogPanel's content
-/// will modify the dialog contained the concerned interlocutor
-fn dialog_dive(
-    mut dialog_dive_event: EventReader<DialogDiveEvent>,
+/// If the state asked is a `Content::Choice` without any choice verified
+/// don't transit to the new state.
+/// Else transit and throw all trigger events.
+fn change_dialog_state(
+    mut change_state_event: EventReader<ChangeStateEvent>,
     current_interlocutor: Res<CurrentInterlocutor>,
+    mut dialogs: ResMut<DialogMap>,
     active_world_events: Res<ActiveWorldEvents>,
-    mut dialog_query: Query<&mut Dialog, With<Portrait>>,
 
     mut trigger_event: EventWriter<TriggerEvents>,
 ) {
-    for DialogDiveEvent { child_index, skip } in dialog_dive_event.iter() {
-        // info!("DEBUG: DialogDive Event");
+    for ChangeStateEvent(new_state) in change_state_event.iter() {
         match current_interlocutor.interlocutor {
             None => {}
-            Some(_interlocutor) => {
-                let mut dialog = dialog_query.get_mut(current_interlocutor.unwrap()).unwrap();
-
-                match &dialog.current_node {
-                    None => {}
-                    Some(current_node_string) => {
-                        // println!("DEBUG: \n{}", dialog.current_node.clone().unwrap());
-
-                        let dialog_tree = init_tree_file(
-                            current_node_string.to_string(),
-                            DialogCustomInfos::new(
-                                WorldEvent::iter()
-                                    .map(|x| x.to_string())
-                                    .collect::<Vec<String>>(),
-                                None,
-                                WorldEvent::iter()
-                                    .map(|x| x.to_string())
-                                    .collect::<Vec<String>>(),
-                            ),
-                        );
-
-                        let mut current_node = dialog_tree.borrow_mut();
-
-                        match current_node.content().split_first() {
-                            None => {}
-                            Some((first, rem)) => {
-                                match first {
-                                    DialogContent::Text(_) => {
-                                        dialog.current_node = if current_node.content().len() > 1 {
-                                            // The monologue is not finished
-                                            *current_node.content_mut() = rem.to_vec();
-                                            Some(current_node.print_file())
-                                        } else if current_node.is_end_node() {
-                                            info!("clear dialog panel");
-                                            trigger_event.send(TriggerEvents(
-                                                current_node.trigger_event().to_vec(),
-                                            ));
-                                            None
-                                        }
-                                        // there is not one choice verified nor a text: don't overwrite the current_node to let the last npc sentence
-                                        else if !current_node.at_least_one_child_is_verified(
-                                            None,
-                                            Some(
-                                                active_world_events
-                                                    .active_world_events
-                                                    .iter()
-                                                    .map(|x| x.to_string())
-                                                    .collect::<Vec<String>>(),
-                                            ),
-                                        ) {
-                                            // no change if this node is still a dead end (even with children)
-                                            dialog.current_node.clone()
-                                        } else {
-                                            trigger_event.send(TriggerEvents(
-                                                current_node.trigger_event().to_vec(),
-                                            ));
-                                            // DOC: Specifics Rules link - Children (Text/Choice)
-                                            Some(
-                                                current_node.children()[*child_index]
-                                                    .borrow()
-                                                    .print_file(),
-                                            )
-                                        };
-                                    }
-                                    DialogContent::Choice {
-                                        text: _,
-                                        condition: _,
-                                    } => {
-                                        if *skip {
-                                            return;
-                                        }
-                                        dialog.current_node = if current_node.is_end_node() {
-                                            info!("clear dialog panel");
-                                            None
-                                        } else {
-                                            // DOC: Specifics Rules link - Children (Text/Choice)
-                                            Some(
-                                                current_node.children()[*child_index]
-                                                    .borrow()
-                                                    .print_file(),
-                                            )
-                                        };
-                                        trigger_event.send(TriggerEvents(
-                                            current_node.trigger_event().to_vec(),
-                                        ));
+            Some(interlocutor) => {
+                if let Some((current_state, ref dialog)) = dialogs.get_mut(&interlocutor) {
+                    if let Some(current_node) = dialog.get(new_state) {
+                        let new_state_is_available = match current_node.content() {
+                            Content::Choices(choices) => {
+                                let mut at_least_one_is_verified = false;
+                                for choice in choices {
+                                    if choice.is_verified(
+                                        None,
+                                        active_world_events
+                                            .iter()
+                                            .map(|x| x.to_string())
+                                            .collect::<Vec<String>>(),
+                                    ) {
+                                        // transit if at least on verified
+                                        at_least_one_is_verified = true;
+                                        break;
                                     }
                                 }
+                                at_least_one_is_verified
                             }
+                            Content::Monolog { .. } => true,
                         };
-                        // println!("DEBUG: \n{}", dialog.current_node.clone().unwrap());
+
+                        if new_state_is_available {
+                            *current_state = *new_state;
+                            trigger_event
+                                .send(TriggerEvents(current_node.trigger_event().to_vec()));
+                        }
                     }
+                }
+            }
+        }
+    }
+}
+
+/// If the resource `Monolog` is changed,
+/// update the NPC/Player text.
+fn update_monolog(
+    current_monolog: Res<Monolog>,
+
+    mut npc_panel_query: Query<&mut Text, (With<NPCPanel>, Without<PlayerPanel>)>,
+    mut player_panel_query: Query<&mut Text, (With<PlayerPanel>, Without<NPCPanel>)>,
+) {
+    if current_monolog.is_changed() {
+        match current_monolog.texts.first() {
+            None => {
+                let mut player_text = player_panel_query.single_mut();
+                let mut npc_text = npc_panel_query.single_mut();
+                player_text.sections[0].value.clear();
+                npc_text.sections[0].value.clear();
+            }
+            Some(first) => {
+                if current_monolog.source == *"Player" {
+                    let mut player_text = player_panel_query.single_mut();
+                    player_text.sections[0].value = first.to_string();
+                } else {
+                    let mut npc_text = npc_panel_query.single_mut();
+                    npc_text.sections[0].value = first.to_string();
                 }
             }
         }
@@ -389,174 +376,147 @@ fn dialog_dive(
 /// # Process
 ///
 /// check the current node from the interlocutor
-/// DOC: TODO
-/// - this is a text
-///   - change the text from the upper_scroll
-///   - clear the player_scroll (choice panel)
-/// - this is a choice
+/// - this is a monolog
+///   - change the resource monolog
+/// - this is a set of choices
 ///   - Player Choice
-///     - update the player_scroll (implied: let the upper_scroll)
+///     - display only the verified choice to the button choice
 ///   - NPC Choice
-///     TODO: feature - NPC Choice
-///     for now, the player has to choose what the npc should say..
+///     - Randomly choose without display anything and ask to change state instantly
 fn update_dialog_panel(
     current_interlocutor: Res<CurrentInterlocutor>,
     active_world_events: Res<ActiveWorldEvents>,
-    dialog_changed_query: Query<Entity, Changed<Dialog>>,
-    dialog_query: Query<&Dialog, With<Portrait>>,
+    dialogs: Res<DialogMap>,
 
+    mut current_monolog: ResMut<Monolog>,
     mut npc_panel_query: Query<&mut Text, (With<NPCPanel>, Without<PlayerPanel>)>,
     mut player_panel_query: Query<&mut Text, (With<PlayerPanel>, Without<NPCPanel>)>,
-    mut player_choices_query: Query<(&Choice, &mut Visibility, &Children)>,
+    mut player_choices_query: Query<(&mut ButtonChoice, &mut Visibility, &Children)>,
     mut text_query: Query<&mut Text, (Without<PlayerPanel>, Without<NPCPanel>)>,
 
-    mut dialog_dive_event: EventWriter<DialogDiveEvent>,
+    mut change_state_event: EventWriter<ChangeStateEvent>,
 ) {
     if !current_interlocutor.is_none()
-        && (current_interlocutor.is_changed() || !dialog_changed_query.is_empty())
+        && (current_interlocutor.is_changed() || dialogs.is_changed())
     {
         // info!("UpdateDialogPanel");
-        let dialog = dialog_query
-            .get(current_interlocutor.interlocutor.unwrap())
-            .unwrap();
+        match current_interlocutor.interlocutor {
+            // assert_eq!(!current_interlocutor.is_none(), current_interlocutor.interlocutor == None)
+            None => warn!("Logic Crack: current_interlocutor is None while being not None"),
+            Some(interlocutor) => {
+                if let Some(&(current_state, ref dialog)) = dialogs.get(&interlocutor) {
+                    // info!("current_state: {}", current_state);
+                    let mut player_text = player_panel_query.single_mut();
+                    let mut npc_text = npc_panel_query.single_mut();
 
-        let mut player_text = player_panel_query.single_mut();
-        let mut npc_text = npc_panel_query.single_mut();
-
-        match &dialog.current_node {
-            None => {
-                npc_text.sections[0].value.clear();
-                player_text.sections[0].value.clear();
-                for (_, mut visibility, _) in &mut player_choices_query {
-                    *visibility = Visibility::Hidden;
-                }
-            }
-            Some(current) => {
-                let dialog_tree = init_tree_file(
-                    current.to_owned(),
-                    DialogCustomInfos::new(
-                        WorldEvent::iter()
-                            .map(|x| x.to_string())
-                            .collect::<Vec<String>>(),
-                        None,
-                        WorldEvent::iter()
-                            .map(|x| x.to_string())
-                            .collect::<Vec<String>>(),
-                    ),
-                );
-
-                let current_node = dialog_tree.borrow();
-                let dialogs = &current_node.content();
-
-                match &dialogs.first() {
-                    // REFACTOR: Stop panic
-                    None => panic!("Err: dialog_content is empty"),
-                    Some(DialogContent::Text(text)) => {
-                        if current_node.author().clone().unwrap() == "Player" {
-                            player_text.sections[0].value = text.clone();
-                        } else {
-                            // replace the entire npc panel's content
-                            npc_text.sections[0].value = text.clone();
-
-                            // Clear the previous choice if there is any
+                    match dialog.get(&current_state) {
+                        None => {
+                            npc_text.sections[0].value.clear();
+                            player_text.sections[0].value.clear();
                             for (_, mut visibility, _) in &mut player_choices_query {
                                 *visibility = Visibility::Hidden;
                             }
                         }
-                    }
-                    Some(DialogContent::Choice {
-                        text: _,
-                        condition: _,
-                    }) => {
-                        if current_node.author().clone().unwrap() == "Player" {
-                            // replace current by the new set of choices
-                            let mut choices = Vec::<String>::new();
-                            for dialog in dialogs.iter() {
-                                match dialog {
-                                    DialogContent::Choice { text, condition } => {
-                                        match condition {
-                                            Some(cond) => {
-                                                if cond.is_verified(
-                                                    None,
-                                                    Some(active_world_events.active_world_events
-                                                        .iter()
-                                                        .map(|x| x.to_string())
-                                                        .collect::<Vec<String>>())
-                                                ) {
-                                                    choices.push(text.to_owned());
-                                                    // info!("DEBUG: add choice: {}", text);
-                                                }
-                                            }
-                                            // no condition
-                                            None => {
-                                                choices.push(text.to_owned());
-                                                // info!("DEBUG: add choice: {}", text);
+                        Some(current_node) => {
+                            match current_node.content() {
+                                Content::Monolog {
+                                    text,
+                                    exit_state: _,
+                                } => {
+                                    if current_node.source() == &"Player".to_string() {
+                                        current_monolog.texts = text.clone();
+                                        current_monolog.source = current_node.source().to_string();
+                                    } else {
+                                        current_monolog.texts = text.clone();
+                                        current_monolog.source = current_node.source().to_string();
+
+                                        // Clear the previous choice if there is any
+                                        for (_, mut visibility, _) in &mut player_choices_query {
+                                            *visibility = Visibility::Hidden;
+                                        }
+                                        // Cler the player Part
+                                        player_text.sections[0].value.clear();
+                                    }
+                                }
+                                Content::Choices(choices) => {
+                                    if current_node.source() == &"Player".to_string() {
+                                        // replace current by the new set of choices
+                                        let mut verified_choices = Vec::<(usize, String)>::new();
+
+                                        for choice in choices.iter() {
+                                            if choice.is_verified(
+                                                None,
+                                                active_world_events
+                                                    .iter()
+                                                    .map(|x| x.to_string())
+                                                    .collect::<Vec<String>>(),
+                                            ) {
+                                                // info!(
+                                                //     "{} -> {}",
+                                                //     choice.text().to_owned(),
+                                                //     *choice.exit_state()
+                                                // );
+                                                verified_choices.push((
+                                                    *choice.exit_state(),
+                                                    choice.text().to_owned(),
+                                                ));
                                             }
                                         }
-                                    }
-                                    _ => panic!(
-                                        "Err: DialogTree Incorrect; A choices' vector contains something else"
-                                    ),
-                                }
-                            }
-                            player_text.sections[0].value.clear();
 
-                            for (choice_index, mut visibility, children) in
-                                &mut player_choices_query
-                            {
-                                // Here you could compare the index with `dialogs.len()` to incorpore all choice but
-                                // lock the unsatisfied choice's condition
-                                if choice_index.0 < choices.len() {
-                                    let mut text = text_query.get_mut(children[0]).unwrap();
-                                    text.sections[0].value = choices[choice_index.0].clone();
-                                    *visibility = Visibility::Inherited;
-                                } else {
-                                    *visibility = Visibility::Hidden;
-                                }
-                            }
+                                        player_text.sections[0].value.clear();
 
-                            // Remove all text which aren't said by the current interlocutor
-                            if current_interlocutor.is_changed() {
-                                npc_text.sections[0].value.clear();
-                            }
-                        } else {
-                            // NPC Choices
-                            let mut possible_choices_index: Vec<usize> = Vec::new();
-                            for (index, dialog) in dialogs.iter().enumerate() {
-                                match dialog {
-                                    DialogContent::Choice { text: _, condition } => {
-                                        match condition {
-                                            Some(cond) => {
-                                                if cond.is_verified(
-                                                    None,
-                                                    Some(active_world_events.active_world_events
-                                                        .iter()
-                                                        .map(|x| x.to_string())
-                                                        .collect::<Vec<String>>())
-                                                ) {
-                                                    possible_choices_index.push(index);
-                                                }
-                                            }
-                                            // no condition
-                                            None => {
-                                                possible_choices_index.push(index);
+                                        for (mut button_infos, mut visibility, children) in
+                                            &mut player_choices_query
+                                        {
+                                            // Here you could compare the index with `dialogs.len()` to incorpore all choice but
+                                            // lock the unsatisfied choice's condition
+                                            if button_infos.ui_posiiton < verified_choices.len() {
+                                                let mut text =
+                                                    text_query.get_mut(children[0]).unwrap();
+                                                text.sections[0].value = verified_choices
+                                                    [button_infos.ui_posiiton]
+                                                    .1
+                                                    .clone();
+                                                button_infos.exit_state =
+                                                    verified_choices[button_infos.ui_posiiton].0;
+                                                *visibility = Visibility::Inherited;
+                                            } else {
+                                                *visibility = Visibility::Hidden;
                                             }
                                         }
+
+                                        // Remove all text which aren't said by the current interlocutor
+                                        if current_interlocutor.is_changed() {
+                                            npc_text.sections[0].value.clear();
+                                        }
+                                    } else {
+                                        // NPC Choices
+                                        let mut possible_choices_index: Vec<usize> = Vec::new();
+                                        for (index, choice) in choices.iter().enumerate() {
+                                            match choice.condition() {
+                                                None => possible_choices_index.push(index),
+                                                Some(condition) => {
+                                                    if condition.is_verified(
+                                                        None,
+                                                        active_world_events
+                                                            .iter()
+                                                            .map(|x| x.to_string())
+                                                            .collect::<Vec<String>>(),
+                                                    ) {
+                                                        possible_choices_index.push(index);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if let Some(child_index) =
+                                            possible_choices_index.choose(&mut rand::thread_rng())
+                                        {
+                                            change_state_event.send(ChangeStateEvent(*child_index))
+                                        } else {
+                                            // TODO: if `possible_choices_index.is_empty()`
+                                        }
                                     }
-                                    _ => panic!(
-                                        "Err: DialogTree Incorrect; A choices' vector contains something else"
-                                    ),
                                 }
-                            }
-                            if let Some(child_index) =
-                                possible_choices_index.choose(&mut rand::thread_rng())
-                            {
-                                dialog_dive_event.send(DialogDiveEvent {
-                                    child_index: *child_index,
-                                    skip: false,
-                                });
-                            } else {
-                                // TODO: if `possible_choices_index.is_empty()`
                             }
                         }
                     }
@@ -566,6 +526,7 @@ fn update_dialog_panel(
     }
 }
 
+/// Put the right portrait in the left panel
 fn change_interlocutor_portrait(
     current_interlocutor: Res<CurrentInterlocutor>,
     mut portrait_panel_query: Query<&mut UiImage, With<InterlocutorPortait>>,
@@ -599,26 +560,6 @@ fn button_system(
     }
 }
 
-// /// Disables empty button.
-// ///
-// /// Prevents checking a index in the choices list.
-// fn button_visibility(
-//     mut choice_buttons_query: Query<(&mut Visibility, &Choice, &Children), With<Button>>,
-//     text_changed_query: Query<&Text, Changed<Text>>,
-// ) {
-//     if !text_changed_query.is_empty() {
-//         for (mut visibility, _choice_index, children) in &mut choice_buttons_query {
-//             if let Ok(text) = text_changed_query.get(children[0]) {
-//                 *visibility = if text.sections.is_empty() {
-//                     Visibility::Hidden
-//                 } else {
-//                     Visibility::Inherited
-//                 };
-//             }
-//         }
-//     }
-// }
-
 fn spawn_camera(mut commands: Commands) {
     let mut camera = Camera2dBundle::default();
 
@@ -627,125 +568,229 @@ fn spawn_camera(mut commands: Commands) {
     commands.spawn(camera);
 }
 
-pub const OLD_FROG_DIALOG: &str = "# Old Frog
+const OLD_FROG_DIALOG: &str = "1:
+  source: Old Frog
+  content:
+    text:
+      - KeroKero
+      - I want you to talk with the last Frog. All the way.
+    exit_state: 2
+2:
+  source: Player
+  content:
+    - text: Done ?
+      condition:
+        events:
+            - FrogTalk
+      exit_state: 3
+3:
+  source: Old Frog
+  content:
+    text:
+      - You have my respect.
+      - Press Reset or alt+f4.
+    exit_state: 4\n";
 
-- KeroKero
-- I want you to talk with the last Frog. All the way.
+const FROG_DIALOG: &str = "1:
+  source: Frog
+  content:
+    - text: KeroKero
+      condition: null
+      exit_state: 2
+    - text: Crôaa
+      condition: null
+      exit_state: 3
+    - text: bêêh
+      condition: null
+      exit_state: 4
+2:
+  source: Frog
+  content:
+    text:
+      - KeroKero
+    exit_state: 5
+3:
+  source: Frog
+  content:
+    text:
+      - Crôaa
+    exit_state: 5
+4:
+  source: Frog
+  content:
+    text:
+      - bêêh
+    exit_state: 5
+5:
+  source: Player
+  content:
+    text:
+      - I wanted to say you something
+    exit_state: 6
+6:
+  source: Player
+  content:
+  - text: You = Cool
+    condition: null
+    exit_state: 7
+  - text: You = Not Cool
+    condition: null
+    exit_state: 8
+7:
+  source: Frog
+  content:
+    text:
+      - Big love on you <3
+    exit_state: 9
+  trigger_event:
+    - FrogLove
 
-## Player
+8:
+  source: Frog
+  content:
+    text:
+      - I'm sad now.
+    exit_state: 9
+  trigger_event:
+    - FrogHate\n";
 
-- Done ? | e: FrogTalk;
+const WARRIOR_DIALOG: &str = "1:
+  source: Warrior Frog
+  content:
+    text:
+      - Hey
+      - I mean... KeroKero
+      - Can you bring my love to my homegirl the Frog in the Middle ?
+    exit_state: 2
+2:
+  source: Player
+  content:
+    - text: Oh Jeez I messed up
+      condition:
+        events:
+            - FrogHate
+      exit_state: 3
+    - text: The Frog is in love
+      condition:
+        events:
+            - FrogLove
+      exit_state: 4
+3:
+  source: Warrior Frog
+  content:
+    text:
+      - :0
+    exit_state: 5
+  trigger_event:
+    - FrogTalk
+4:
+  source: Warrior Frog
+  content:
+    text:
+      - <3
+    exit_state: 5
+  trigger_event:
+    - FrogTalk\n";
 
-### Old Frog
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>, mut dialogs: ResMut<DialogMap>) {
+    /* -------------------------------------------------------------------------- */
+    /*                                  Portraits                                 */
+    /* -------------------------------------------------------------------------- */
 
-- You have my respect.
-- Press Reset or alt+f4.\n";
+    let old_frog_portrait = commands
+        .spawn((
+            ImageBundle {
+                image: UiImage {
+                    texture: asset_server.load("textures/character/Icons_12.png"),
+                    flip_x: true,
+                    ..default()
+                },
+                style: Style {
+                    size: Size::width(Val::Percent(10.)),
+                    ..default()
+                },
+                ..default()
+            },
+            Name::new("Old Frog Portrait"),
+            Portrait,
+            Interaction::default(),
+        ))
+        .id();
+    // DOC: unwrap use
+    let old_frog_deserialized_map: BTreeMap<usize, DialogNodeYML> =
+        serde_yaml::from_str(OLD_FROG_DIALOG).unwrap();
+    dialogs.insert(
+        old_frog_portrait,
+        (
+            *old_frog_deserialized_map.first_key_value().unwrap().0,
+            old_frog_deserialized_map,
+        ),
+    );
 
-pub const FROG_DIALOG: &str = "# Frog
+    let frog_portrait = commands
+        .spawn((
+            ImageBundle {
+                image: UiImage {
+                    texture: asset_server.load("textures/character/Icons_23.png"),
+                    flip_x: true,
+                    ..default()
+                },
+                style: Style {
+                    size: Size::width(Val::Percent(10.)),
+                    ..default()
+                },
+                ..default()
+            },
+            Name::new("Frog Portrait"),
+            Portrait,
+            Interaction::default(),
+        ))
+        .id();
+    // DOC: unwrap use
+    let frog_deserialized_map: BTreeMap<usize, DialogNodeYML> =
+        serde_yaml::from_str(FROG_DIALOG).unwrap();
+    dialogs.insert(
+        frog_portrait,
+        (
+            *frog_deserialized_map.first_key_value().unwrap().0,
+            frog_deserialized_map,
+        ),
+    );
 
-- KeroKero | None
-- Crôaa | None
-- bêêh | None
+    let warrior_frog_portrait = commands
+        .spawn((
+            ImageBundle {
+                image: UiImage {
+                    texture: asset_server.load("textures/character/Icons_27.png"),
+                    flip_x: true,
+                    ..default()
+                },
+                style: Style {
+                    size: Size::width(Val::Percent(10.)),
+                    ..default()
+                },
+                ..default()
+            },
+            Name::new("Warrior Frog Portrait"),
+            Interaction::default(),
+            Portrait,
+        ))
+        .id();
+    // DOC: unwrap use
+    let warrior_frog_deserialized_map: BTreeMap<usize, DialogNodeYML> =
+        serde_yaml::from_str(WARRIOR_DIALOG).unwrap();
+    dialogs.insert(
+        warrior_frog_portrait,
+        (
+            *warrior_frog_deserialized_map.first_key_value().unwrap().0,
+            warrior_frog_deserialized_map,
+        ),
+    );
 
-## Frog
+    /* -------------------------------------------------------------------------- */
+    /*                                    Scene                                   */
+    /* -------------------------------------------------------------------------- */
 
-- KeroKero
-
-### Player
-
-- I wanted to say you something
-
-#### Player
-
-- You = Cool | None
-- You = Not Cool | None
-
-##### Frog
-
-- Big love on you /<3
-
--> FrogLove
-
-##### Frog
-
-- I'm sad now.
-
--> FrogHate
-
-## Frog
-
-- Crôaa
-
-### Player
-
-- I wanted to say you something
-
-#### Player
-
-- You = Cool | None
-- You = Not Cool | None
-
-##### Frog
-
-- Big love on you
-
--> FrogLove
-
-##### Frog
-
-- I'm sad now.
-
--> FrogHate
-
-## Frog
-
-- Bêêh
-
-### Player
-
-- I wanted to say you something
-
-#### Player
-
-- You = Cool | None
-- You = Not Cool | None
-
-##### Frog
-
-- Big love on you
-
--> FrogLove
-
-##### Frog
-
-- I'm sad now.
-
--> FrogHate\n";
-
-pub const WARRIOR_DIALOG: &str = "# Warrior Frog
-
-- Hey
-- I mean... KeroKero
-- Can you bring my love to my homegirl the Frog in the Middle ?
-
-## Player
-
-- Oh Jeez I messed up | e: FrogHate;
-- THe Frog is in love | e: FrogLove;
-
-### Warrior Frog
-
-- :0
-
--> FrogTalk
-
-### Warrior Frog
-
-- :)
-
--> FrogTalk\n";
-
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn((
             NodeBundle {
@@ -818,67 +863,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                             },
                             Name::new("Interlocutor Choices"),
                         ))
-                        .with_children(|parent| {
-                            parent.spawn((
-                                ImageBundle {
-                                    image: UiImage {
-                                        texture: asset_server
-                                            .load("textures/character/Icons_12.png"),
-                                        flip_x: true,
-                                        ..default()
-                                    },
-                                    style: Style {
-                                        size: Size::width(Val::Percent(10.)),
-                                        ..default()
-                                    },
-                                    ..default()
-                                },
-                                Name::new("Old Frog Portrait"),
-                                Portrait,
-                                Interaction::default(),
-                                Dialog::all(Some(String::from(OLD_FROG_DIALOG))),
-                            ));
-
-                            parent.spawn((
-                                ImageBundle {
-                                    image: UiImage {
-                                        texture: asset_server
-                                            .load("textures/character/Icons_23.png"),
-                                        flip_x: true,
-                                        ..default()
-                                    },
-                                    style: Style {
-                                        size: Size::width(Val::Percent(10.)),
-                                        ..default()
-                                    },
-                                    ..default()
-                                },
-                                Name::new("Frog Portrait"),
-                                Portrait,
-                                Interaction::default(),
-                                Dialog::all(Some(String::from(FROG_DIALOG))),
-                            ));
-
-                            parent.spawn((
-                                ImageBundle {
-                                    image: UiImage {
-                                        texture: asset_server
-                                            .load("textures/character/Icons_27.png"),
-                                        flip_x: true,
-                                        ..default()
-                                    },
-                                    style: Style {
-                                        size: Size::width(Val::Percent(10.)),
-                                        ..default()
-                                    },
-                                    ..default()
-                                },
-                                Name::new("Warrior Frog Portrait"),
-                                Interaction::default(),
-                                Portrait,
-                                Dialog::all(Some(String::from(WARRIOR_DIALOG))),
-                            ));
-                        });
+                        .push_children(&[old_frog_portrait, frog_portrait, warrior_frog_portrait]);
                 });
 
             parent
@@ -955,10 +940,10 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                                     style: Style {
                                         flex_wrap: FlexWrap::Wrap,
                                         // TODO: Text Style
-                                        margin: UiRect {
-                                            left: Val::Percent(24.),
-                                            ..default()
-                                        },
+                                        // margin: UiRect {
+                                        //     left: Val::Percent(24.),
+                                        //     ..default()
+                                        // },
                                         size: Size::width(Val::Percent(50.)),
                                         align_content: AlignContent::SpaceAround,
                                         align_self: AlignSelf::FlexStart,
@@ -1025,7 +1010,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                                                     ..default()
                                                 },
                                                 Name::new(format!("Choice n°{i}")),
-                                                Choice(i),
+                                                ButtonChoice::new(i),
                                             ))
                                             .with_children(|parent| {
                                                 parent.spawn(TextBundle::from_section(

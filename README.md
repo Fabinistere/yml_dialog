@@ -7,7 +7,7 @@
 
 | bevy | fto-dialog |
 |------|------------|
-| 0.10 | 0.1.0      |
+| 0.10 | 0.2.0      |
 
 ## Naming
 
@@ -15,6 +15,7 @@ Accordingly to this [discussion](https://github.com/bevyengine/bevy/discussions/
 this is not a trivial question.
 
 - yml-dialog
+- dialog-structure
 - md-to-dialog-tree
 - fto-dialog
 - bevy_dialog
@@ -24,22 +25,19 @@ this is not a trivial question.
 ## RoadMap
 
 - [ ] fully functional API to implement a dialog system into a (bevy game or any) app
-  - [ ] Exclude Bevy dependency
-    - [ ] or list all
-      - [ ] `SystemSet` available from this plugin
-      - [ ] `Component` available from this plugin
-    - [ ] Follow all guidelines from [Bevy plugins guidelines](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md)
+  - [ ] Usage
+    - [ ] [Custom (De)Serialize implementation](https://serde.rs/impl-serialize.html).
+      The field `content:` is interpreted as either `monolog:` or `choices:`
+    - [ ] [Generic type](https://doc.rust-lang.org/reference/items/generics.html) for `Condition`
+    - [ ] [Generic type](https://doc.rust-lang.org/reference/items/generics.html) for an `extra` field on the DialogNode
+    - [ ] [Dynamic Macros](https://stackoverflow.com/a/63849405)
+  - [x] Exclude Bevy dependency
   - [ ] Follow all guidelines from [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/checklist.html)
     - [ ] Documentation
       - [x] create an example
     - [ ] Interoperability
       - [x] Types eagerly implement common traits
     - [ ] Macros
-  - [ ] Usage
-    - [ ] [Dynamic Macros](https://stackoverflow.com/a/63849405)
-      - [ ] custom `enum WorldEvent`
-      - [ ] custom `enum TriggerEvent`
-      - [ ] custom `struct DialogCondition`
 
 ## Example
 
@@ -53,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 This project also follows to [A successful Git branching model](https://nvie.com/posts/a-successful-git-branching-model/).
 
 We have to respect all the [rust API convention](https://rust-lang.github.io/api-guidelines/checklist.html).
+For the lore, follow all [Bevy plugins guidelines](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md)
 Run `cargo clippy`, `cargo doc` before commit.
 
 ## License
