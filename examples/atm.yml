@@ -2,7 +2,10 @@
   source: The Frog
   content:
     - text: Hello HomeGirl
-      condition: null
+      condition:
+        events:
+          - HasFriend
+        karma_threshold: null
       exit_state: 2
     - text: KeroKero
       condition: null

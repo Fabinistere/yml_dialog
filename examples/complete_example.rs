@@ -940,10 +940,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>, mut dialogs: Re
                                     style: Style {
                                         flex_wrap: FlexWrap::Wrap,
                                         // TODO: Text Style
-                                        // margin: UiRect {
-                                        //     left: Val::Percent(24.),
-                                        //     ..default()
-                                        // },
                                         size: Size::width(Val::Percent(50.)),
                                         align_content: AlignContent::SpaceAround,
                                         align_self: AlignSelf::FlexStart,
