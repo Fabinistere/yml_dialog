@@ -6,6 +6,11 @@ repository = "https://github.com/Fabinistere/yml_dialog"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 
+exclude = [
+    "assets/*",
+    "examples/test_dialog.yml",
+]
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
