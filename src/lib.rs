@@ -21,7 +21,7 @@ use serde::{
 };
 
 /// This correspond to a unique key
-#[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 #[serde(default)]
 pub struct DialogNodeYML {
     source: String,
@@ -149,7 +149,7 @@ impl DialogNodeYML {
 /// # Note
 ///
 /// TODO: Custom impl Serialization
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[serde(untagged)]
 pub enum Content {
     /// A vector of Choice
@@ -198,7 +198,7 @@ impl Default for Content {
 /// - a `text` line,
 /// - a `condition` and
 /// - an `exit_state` corresponding to the continue of this choice.
-#[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 #[serde(default)]
 pub struct Choice {
     text: String,
@@ -272,7 +272,7 @@ impl Choice {
 // }
 
 /// REFACTOR: Turn this into a Generic Type
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord, Default, Debug, Clone)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub struct Condition {
     events: Vec<String>,
     karma_threshold: Option<(i32, i32)>,
