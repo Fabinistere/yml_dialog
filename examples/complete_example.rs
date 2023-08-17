@@ -492,9 +492,10 @@ fn update_dialog_panel(
                                     } else {
                                         // NPC Choices
                                         let mut possible_choices_index: Vec<usize> = Vec::new();
-                                        for (index, choice) in choices.iter().enumerate() {
+                                        for choice in choices.iter() {
                                             match choice.condition() {
-                                                None => possible_choices_index.push(index),
+                                                None => possible_choices_index
+                                                    .push(*choice.exit_state()),
                                                 Some(condition) => {
                                                     if condition.is_verified(
                                                         None,
@@ -503,7 +504,8 @@ fn update_dialog_panel(
                                                             .map(|x| x.to_string())
                                                             .collect::<Vec<String>>(),
                                                     ) {
-                                                        possible_choices_index.push(index);
+                                                        possible_choices_index
+                                                            .push(*choice.exit_state());
                                                     }
                                                 }
                                             }
@@ -600,7 +602,7 @@ const FROG_DIALOG: &str = "1:
     - text: Crôaa
       condition: null
       exit_state: 3
-    - text: bêêh
+    - text: Bêêh
       condition: null
       exit_state: 4
 2:
@@ -619,7 +621,7 @@ const FROG_DIALOG: &str = "1:
   source: Frog
   content:
     text:
-      - bêêh
+      - Bêêh
     exit_state: 5
 5:
   source: Player
