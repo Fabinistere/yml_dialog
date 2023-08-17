@@ -1,0 +1,29 @@
+1:
+  source: The Frog
+  content:
+    - text: Hello HomeGirl
+      condition:
+        events:
+          - HasFriend
+        karma_threshold: null
+      exit_state: 2
+    - text: KeroKero
+      condition: null
+      exit_state: 3
+  trigger_event: []
+2:
+  source: Random Frog
+  content:
+    text:
+      - Yo Homie
+      - I'm Happy
+    exit_state: 4
+  trigger_event: []
+3:
+  source: Random Frog
+  content:
+    text:
+      - KeroKero
+      - I'm Alone
+    exit_state: 4
+  trigger_event: []

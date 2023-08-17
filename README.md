@@ -1,48 +1,47 @@
-# *Fabien et la Trahison de Olf*'s Dialog System
+# YML based Dialog Structure
 
 <!-- [![Bevy tracking](https://img.shields.io/badge/Bevy%20tracking-released%20version-lightblue)](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md#main-branch-tracking) -->
-<!-- [![v0.1.0](https://img.shields.io/badge/v0.1.0-gray?style=flat&logo=github&logoColor=181717&link=https://github.com/Fabinistere/bevy_turn-based_combat/releases/tag/v0.1.0)](https://github.com/Fabinistere/bevy_turn-based_combat/releases/tag/v0.1.0) -->
-[![Bevy tracking](https://img.shields.io/badge/Bevy%20tracking-0.10-lightblue)](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md#main-branch-tracking)
+[![v0.2.1](https://img.shields.io/badge/v0.2.1-gray?style=flat&logo=github&logoColor=181717&link=https://github.com/Fabinistere/bevy_turn-based_combat/releases/tag/v0.2.1)](https://github.com/Fabinistere/bevy_turn-based_combat/releases/tag/v0.2.1)
+<!-- [![Bevy tracking](https://img.shields.io/badge/Bevy%20tracking-0.10-lightblue)](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md#main-branch-tracking) -->
 [![MIT/Apache 2.0](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](https://github.com/fabinistere/bevy_turn-based_combat#license)
 
-| bevy | fto-dialog |
+<!--
+| bevy | yml_dialog |
 |------|------------|
-| 0.10 | 0.1.0      |
+| 0.10 | 0.2.1      |
+| 0.10 | 0.2.0      |
+-->
 
-## Naming
+## Example
 
-Accordingly to this [discussion](https://github.com/bevyengine/bevy/discussions/1202),
-this is not a trivial question.
+[![complete_example](https://github.com/Fabinistere/yml_dialog/assets/73140258/731025d7-9eed-4b92-a820-a175bf886df7)](https://fabinistere.github.io/yml_dialog/)
 
-- md-to-dialog-tree
-- fto-dialog
-- bevy_dialog
-- bevy_dialog_system
-- bevy_fto_dialog / bevy_fob_dialog
+If you want to compile the code at home, [download assets here](https://cloud.disroot.org/s/sSsjHxXpTH88oyW): disroot's cloud,
+clone the repo, extract the assets in the root of the repo and run `cargo run --example complete_example`.
 
 ## RoadMap
 
 - [ ] fully functional API to implement a dialog system into a (bevy game or any) app
-  - [ ] Exclude Bevy dependency
-    - [ ] or list all
-      - [ ] `SystemSet` available from this plugin
-      - [ ] `Component` available from this plugin
-    - [ ] Follow all guidelines from [Bevy plugins guidelines](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md)
-  - [ ] Follow all guidelines from [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/checklist.html)
-    - [ ] Documentation
-      - [x] create an example
-    - [ ] Interoperability
-      - [x] Types eagerly implement common traits
-    - [ ] Macros
   - [ ] Usage
+    - [ ] [Custom (De)Serialize implementation](https://serde.rs/impl-serialize.html).
+      The field `content:` is interpreted as either `monolog:` or `choices:`
+    - [ ] [Generic type](https://doc.rust-lang.org/reference/items/generics.html) for `Condition`
+    - [ ] [Generic type](https://doc.rust-lang.org/reference/items/generics.html) for an `extra` field on the DialogNode
     - [ ] [Dynamic Macros](https://stackoverflow.com/a/63849405)
-      - [ ] custom `enum WorldEvent`
-      - [ ] custom `enum TriggerEvent`
-      - [ ] custom `struct DialogCondition`
-
-## Example
-
-For the moment, [download assets here](https://cloud.disroot.org/s/NtTonGcxpeyjkwp), clone the repo, extract the assets in the root of the repo and run `cargo run --example complete_example`
+  - [x] Exclude Bevy dependency
+  - [ ] Follow all guidelines from [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/checklist.html)
+    - [ ] **Documentation**
+      - [ ] Examples use `?`, not `try!`, not `unwrap` ([C-QUESTION-MARK](https://rust-lang.github.io/api-guidelines/documentation.html#c-question-mark))
+      - [x] Crate level docs are thorough and include examples ([C-CRATE-DOC](https://rust-lang.github.io/api-guidelines/documentation.html#c-crate-doc))
+      - [x] create an example
+    - [x] **Interoperability**
+      - [x] Types eagerly implement common traits
+      - [x] ...
+    - [ ] **Future proofing** (crate is free to improve without breaking users' code)
+      - [ ] Sealed traits protect against downstream implementations ([C-SEALED](https://rust-lang.github.io/api-guidelines/future-proofing.html#c-sealed))
+      - [x] Structs have private fields ([C-STRUCT-PRIVATE](https://rust-lang.github.io/api-guidelines/future-proofing.html#c-struct-private))
+      - [ ] Newtypes encapsulate implementation details ([C-NEWTYPE-HIDE](https://rust-lang.github.io/api-guidelines/future-proofing.html#c-newtype-hide))
+      - [ ] Data structures do not duplicate derived trait bounds ([C-STRUCT-BOUNDS](https://rust-lang.github.io/api-guidelines/future-proofing.html#c-struct-bounds))
 
 ## Contribute
 
@@ -52,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 This project also follows to [A successful Git branching model](https://nvie.com/posts/a-successful-git-branching-model/).
 
 We have to respect all the [rust API convention](https://rust-lang.github.io/api-guidelines/checklist.html).
+For the lore, follow all [Bevy plugins guidelines](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md).
+
 Run `cargo clippy`, `cargo doc` before commit.
 
 ## License
@@ -71,3 +72,18 @@ See the very good reasons for including both [here](https://github.com/bevyengin
 - [Wikipedia: Dialogue Tree](https://en.wikipedia.org/wiki/Dialogue_tree#)
 - [Wikipedia: Nonlinear Gameplay](https://en.wikipedia.org/wiki/Nonlinear_gameplay)
 - [Bevy's SubReddit: Bevy Dialog Discussion](https://www.reddit.com/r/bevy/comments/wr22n5/ideas_on_the_basic_interface_for_a_dialogue_system/)
+
+I began coding this as a tree strucutre dialog but a graph based is much more suited for a dialog. Maybe after this migration this crate is not needed anymore and will just do a devlog. (and free this name :)
+
+## Naming
+
+Accordingly to this [discussion](https://github.com/bevyengine/bevy/discussions/1202),
+this is not a trivial question.
+
+- ***yml-dialog***
+- dialog-structure
+- md-to-dialog-tree
+- fto-dialog
+- bevy_dialog
+- bevy_dialog_system
+- bevy_fto_dialog / bevy_fob_dialog
