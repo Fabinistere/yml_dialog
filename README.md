@@ -1,11 +1,11 @@
-# *Fabien et la Trahison de Olf*'s Dialog System
+# YML based Dialog Structure
 
 <!-- [![Bevy tracking](https://img.shields.io/badge/Bevy%20tracking-released%20version-lightblue)](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md#main-branch-tracking) -->
 <!-- [![v0.1.0](https://img.shields.io/badge/v0.1.0-gray?style=flat&logo=github&logoColor=181717&link=https://github.com/Fabinistere/bevy_turn-based_combat/releases/tag/v0.1.0)](https://github.com/Fabinistere/bevy_turn-based_combat/releases/tag/v0.1.0) -->
 [![Bevy tracking](https://img.shields.io/badge/Bevy%20tracking-0.10-lightblue)](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md#main-branch-tracking)
 [![MIT/Apache 2.0](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](https://github.com/fabinistere/bevy_turn-based_combat#license)
 
-| bevy | fto-dialog |
+| bevy | yml_dialog |
 |------|------------|
 | 0.10 | 0.2.0      |
 
@@ -41,7 +41,7 @@ this is not a trivial question.
 
 ## Example
 
-For the moment, [download assets here](https://cloud.disroot.org/s/NtTonGcxpeyjkwp), clone the repo, extract the assets in the root of the repo and run `cargo run --example complete_example`
+For the moment, [download assets here](https://cloud.disroot.org/s/NtTonGcxpeyjkwp): disroot's cloud, clone the repo, extract the assets in the root of the repo and run `cargo run --example complete_example`
 
 ## Contribute
 
@@ -51,7 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 This project also follows to [A successful Git branching model](https://nvie.com/posts/a-successful-git-branching-model/).
 
 We have to respect all the [rust API convention](https://rust-lang.github.io/api-guidelines/checklist.html).
-For the lore, follow all [Bevy plugins guidelines](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md)
+For the lore, follow all [Bevy plugins guidelines](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md).
+
 Run `cargo clippy`, `cargo doc` before commit.
 
 ## License
@@ -71,3 +72,5 @@ See the very good reasons for including both [here](https://github.com/bevyengin
 - [Wikipedia: Dialogue Tree](https://en.wikipedia.org/wiki/Dialogue_tree#)
 - [Wikipedia: Nonlinear Gameplay](https://en.wikipedia.org/wiki/Nonlinear_gameplay)
 - [Bevy's SubReddit: Bevy Dialog Discussion](https://www.reddit.com/r/bevy/comments/wr22n5/ideas_on_the_basic_interface_for_a_dialogue_system/)
+
+I began coding this as a tree strucutre dialog but a graph based is much more suited for a dialog. Maybe after this migration this crate is not needed anymore and will just do a devlog.

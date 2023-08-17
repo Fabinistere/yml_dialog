@@ -1,8 +1,8 @@
 [package]
-name = "fto-dialog"
+name = "yml_dialog"
 version = "0.2.0"
 authors = ["Olf EPAIN <wabtey@disroot.org>", "Morgan Van Amerongen <vanamerongen.morgan@gmail.com>"]
-repository = "https://github.com/Fabinistere/fto-dialog"
+repository = "https://github.com/Fabinistere/yml_dialog"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 
