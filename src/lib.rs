@@ -77,7 +77,7 @@ impl DialogNodeYML {
 /// A Node is either a list of choice or a monolog
 ///
 /// ```rust
-/// use fto_dialog::*;
+/// use yml_dialog::*;
 /// use std::collections::BTreeMap;
 ///
 /// let mut map = BTreeMap::new();

@@ -1,11 +1,11 @@
-use fto_dialog::*;
 use std::{fmt, str::FromStr};
+use yml_dialog::*;
 // use serde::Serialize;
 #[cfg(test)]
 use std::collections::BTreeMap;
 
-const KARMA_MAX: i32 = 100;
-const KARMA_MIN: i32 = -KARMA_MAX;
+// const KARMA_MAX: i32 = 100;
+// const KARMA_MIN: i32 = -KARMA_MAX;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 enum WorldEvent {

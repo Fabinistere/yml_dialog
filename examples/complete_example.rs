@@ -15,7 +15,7 @@ use bevy::{
 use rand::seq::SliceRandom;
 use std::{collections::BTreeMap, fmt, str::FromStr};
 
-use fto_dialog::{Content, DialogNodeYML};
+use yml_dialog::{Content, DialogNodeYML};
 
 // dark purple #25131a = 39/255, 19/255, 26/255
 const CLEAR: bevy::render::color::Color = bevy::render::color::Color::rgb(0.153, 0.07, 0.102);
