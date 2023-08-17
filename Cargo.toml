@@ -1,6 +1,6 @@
 [package]
 name = "yml_dialog"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Olf EPAIN <wabtey@disroot.org>", "Morgan Van Amerongen <vanamerongen.morgan@gmail.com>"]
 description = "A very light base structure to implement an Rust Dialog using YML (file) format"
 keywords = ["game", "rust", "structure", "dialog", "yml", "bevy", "serialize", "deserialize"]
