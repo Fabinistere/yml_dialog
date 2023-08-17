@@ -50,7 +50,7 @@ fn test_yaml_monolog_serialize_1() {
     let mut map = BTreeMap::new();
     map.insert(
         1,
-        DialogNodeYML::new(
+        DialogNode::new(
             "Le Pape".to_string(),
             Content::Monolog {
                 text: vec![String::from("Hello Homie")],
@@ -81,7 +81,7 @@ fn test_yaml_monolog_serialize_2() {
     let mut map = BTreeMap::new();
     map.insert(
         1,
-        DialogNodeYML::new(
+        DialogNode::new(
             "The Frog".to_string(),
             Content::Monolog {
                 text: vec![
@@ -96,7 +96,7 @@ fn test_yaml_monolog_serialize_2() {
     );
     map.insert(
         2,
-        DialogNodeYML::new(
+        DialogNode::new(
             "Random Frog".to_string(),
             Content::Monolog {
                 text: vec![String::from("KeroKero")],
@@ -136,7 +136,7 @@ fn test_yaml_choices_serialize_1() {
     let mut map = BTreeMap::new();
     map.insert(
         1,
-        DialogNodeYML::new(
+        DialogNode::new(
             "The Frog".to_string(),
             Content::Choices(vec![
                 Choice::new(String::from("Hello HomeGirl"), None, 2),
@@ -147,7 +147,7 @@ fn test_yaml_choices_serialize_1() {
     );
     map.insert(
         2,
-        DialogNodeYML::new(
+        DialogNode::new(
             "Random Frog".to_string(),
             Content::Monolog {
                 text: vec![String::from("Yo Homie")],
@@ -158,7 +158,7 @@ fn test_yaml_choices_serialize_1() {
     );
     map.insert(
         3,
-        DialogNodeYML::new(
+        DialogNode::new(
             "Random Frog".to_string(),
             Content::Monolog {
                 text: vec![String::from("KeroKero")],
@@ -206,7 +206,7 @@ fn test_yaml_choices_condition_serialize() {
     let mut map = BTreeMap::new();
     map.insert(
         1,
-        DialogNodeYML::new(
+        DialogNode::new(
             "The Frog".to_string(),
             Content::Choices(vec![
                 Choice::new(
@@ -224,7 +224,7 @@ fn test_yaml_choices_condition_serialize() {
     );
     map.insert(
         2,
-        DialogNodeYML::new(
+        DialogNode::new(
             "Random Frog".to_string(),
             Content::Monolog {
                 text: vec![String::from("Yo Homie")],
@@ -235,7 +235,7 @@ fn test_yaml_choices_condition_serialize() {
     );
     map.insert(
         3,
-        DialogNodeYML::new(
+        DialogNode::new(
             "Random Frog".to_string(),
             Content::Monolog {
                 text: vec![String::from("KeroKero")],
@@ -293,7 +293,7 @@ fn test_yaml_monolog_deserialize_field_missing() {
     let mut map = BTreeMap::new();
     map.insert(
         1,
-        DialogNodeYML::new(
+        DialogNode::new(
             "Le Pape".to_string(),
             Content::Monolog {
                 text: vec![String::from("Hello Homie")],
@@ -303,7 +303,7 @@ fn test_yaml_monolog_deserialize_field_missing() {
         ),
     );
 
-    let deserialized_map: BTreeMap<usize, DialogNodeYML> = serde_yaml::from_str(&yaml).unwrap();
+    let deserialized_map: BTreeMap<usize, DialogNode> = serde_yaml::from_str(&yaml).unwrap();
 
     assert_eq!(map, deserialized_map)
 }
@@ -343,7 +343,7 @@ fn test_generic_type_deserialize() {
     let mut map = BTreeMap::new();
     map.insert(
         1,
-        DialogNodeYML::new(
+        DialogNode::new(
             "Le Pape".to_string(),
             Content::Monolog {
                 text: vec![String::from("Hello Homie")],
@@ -354,7 +354,7 @@ fn test_generic_type_deserialize() {
     );
     map.insert(
         2,
-        DialogNodeYML::new(
+        DialogNode::new(
             "The Frog".to_string(),
             Content::Choices(vec![
                 Choice::new(
@@ -368,7 +368,7 @@ fn test_generic_type_deserialize() {
         ),
     );
 
-    let deserialized_map: BTreeMap<usize, DialogNodeYML> = serde_yaml::from_str(&yaml).unwrap();
+    let deserialized_map: BTreeMap<usize, DialogNode> = serde_yaml::from_str(&yaml).unwrap();
 
     assert_eq!(map, deserialized_map)
 }
@@ -378,7 +378,7 @@ fn test_custom_serialize() {
     let mut map = BTreeMap::new();
     map.insert(
         1,
-        DialogNodeYML::new(
+        DialogNode::new(
             "The Frog".to_string(),
             Content::Choices(vec![
                 Choice::new(String::from("Hello HomeGirl"), None, 2),
@@ -389,7 +389,7 @@ fn test_custom_serialize() {
     );
     map.insert(
         2,
-        DialogNodeYML::new(
+        DialogNode::new(
             "Random Frog".to_string(),
             Content::Monolog {
                 text: vec![String::from("Yo Homie")],
@@ -400,7 +400,7 @@ fn test_custom_serialize() {
     );
     map.insert(
         3,
-        DialogNodeYML::new(
+        DialogNode::new(
             "Random Frog".to_string(),
             Content::Monolog {
                 text: vec![String::from("KeroKero")],

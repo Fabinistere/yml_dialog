@@ -15,7 +15,7 @@ use bevy::{
 use rand::seq::SliceRandom;
 use std::{collections::BTreeMap, fmt, str::FromStr};
 
-use yml_dialog::{Content, DialogNodeYML};
+use yml_dialog::{Content, DialogNode};
 
 // dark purple #25131a = 39/255, 19/255, 26/255
 const CLEAR: bevy::render::color::Color = bevy::render::color::Color::rgb(0.153, 0.07, 0.102);
@@ -75,7 +75,7 @@ impl FromStr for WorldEvent {
 /// - `key`: interlocutor
 /// - `value`: (current state, BinaryTreeMap of the dialog)
 #[derive(Debug, Deref, DerefMut, Default, Resource)]
-struct DialogMap(BTreeMap<Entity, (usize, BTreeMap<usize, DialogNodeYML>)>);
+struct DialogMap(BTreeMap<Entity, (usize, BTreeMap<usize, DialogNode>)>);
 
 /// Contains all the line of the current monolog
 ///
@@ -717,7 +717,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>, mut dialogs: Re
         ))
         .id();
     // DOC: unwrap use
-    let old_frog_deserialized_map: BTreeMap<usize, DialogNodeYML> =
+    let old_frog_deserialized_map: BTreeMap<usize, DialogNode> =
         serde_yaml::from_str(OLD_FROG_DIALOG).unwrap();
     dialogs.insert(
         old_frog_portrait,
@@ -747,7 +747,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>, mut dialogs: Re
         ))
         .id();
     // DOC: unwrap use
-    let frog_deserialized_map: BTreeMap<usize, DialogNodeYML> =
+    let frog_deserialized_map: BTreeMap<usize, DialogNode> =
         serde_yaml::from_str(FROG_DIALOG).unwrap();
     dialogs.insert(
         frog_portrait,
@@ -777,7 +777,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>, mut dialogs: Re
         ))
         .id();
     // DOC: unwrap use
-    let warrior_frog_deserialized_map: BTreeMap<usize, DialogNodeYML> =
+    let warrior_frog_deserialized_map: BTreeMap<usize, DialogNode> =
         serde_yaml::from_str(WARRIOR_DIALOG).unwrap();
     dialogs.insert(
         warrior_frog_portrait,
