@@ -1,8 +1,7 @@
-use std::{fmt, str::FromStr};
-use yml_dialog::*;
-// use serde::Serialize;
 #[cfg(test)]
 use std::collections::BTreeMap;
+use std::{fmt, str::FromStr};
+use yml_dialog::*;
 
 // const KARMA_MAX: i32 = 100;
 // const KARMA_MIN: i32 = -KARMA_MAX;
@@ -309,66 +308,137 @@ fn test_yaml_monolog_deserialize_field_missing() {
     assert_eq!(map, deserialized_map)
 }
 
-// #[derive(Serialize, Deserialize, Default)]
-// struct Condition(Vec<WorldEvent>);
+/*
+#[derive(Serialize, Deserialize, Default)]
+struct Condition(Vec<WorldEvent>);
 
-// #[derive(Serialize, Deserialize, Default)]
-// #[serde(untagged)]
-// enum WorldEvent {
-//     #[default]
-//     HasCharisma,
-//     HasFriends,
-// }
+#[derive(Serialize, Deserialize, Default)]
+#[serde(untagged)]
+enum WorldEvent {
+    #[default]
+    HasCharisma,
+    HasFriends,
+}
 
-// #[test]
-// fn test_generic_type_deserialize() {
-//     let yaml = "1:
-//   source: La Pape
-//   content:
-//     text:
-//     - Hello Homie
-//     exit_state: 2
-// 2:
-//   source: The Frog
-//   content:
-//   - text: Hello HomeGirl
-//     condition: !Condition
-//     - HasCharisma
-//     exit_state: 3
-//   - text: KeroKero
-//     condition: null
-//     exit_state: 1
-//   trigger_event: []\n";
+#[test]
+fn test_generic_type_deserialize() {
+    let yaml = "1:
+  source: La Pape
+  content:
+    text:
+    - Hello Homie
+    exit_state: 2
+2:
+  source: The Frog
+  content:
+  - text: Hello HomeGirl
+    condition: !Condition
+    - HasCharisma
+    exit_state: 3
+  - text: KeroKero
+    condition: null
+    exit_state: 1
+  trigger_event: []\n";
 
-//     let mut map = BTreeMap::new();
-//     map.insert(
-//         1,
-//         DialogNodeYML::new(
-//             "Le Pape".to_string(),
-//             Content::Monolog {
-//                 text: vec![String::from("Hello Homie")],
-//                 exit_state: 2,
-//             },
-//             vec![],
-//         ),
-//     );
-//     map.insert(
-//         2,
-//         DialogNodeYML::new(
-//             "The Frog".to_string(),
-//             Content::Choices(vec![
-//                 Choice::new(
-//                     "Hello HomeGirl".to_string(),
-//                     Some(Condition(vec![WorldEvent::HasCharisma])),
-//                     3,
-//                 ),
-//                 Choice::new("KeroKero".to_string(), None, 1),
-//             ]),
-//             vec![],
-//         ),
-//     );
+    let mut map = BTreeMap::new();
+    map.insert(
+        1,
+        DialogNodeYML::new(
+            "Le Pape".to_string(),
+            Content::Monolog {
+                text: vec![String::from("Hello Homie")],
+                exit_state: 2,
+            },
+            vec![],
+        ),
+    );
+    map.insert(
+        2,
+        DialogNodeYML::new(
+            "The Frog".to_string(),
+            Content::Choices(vec![
+                Choice::new(
+                    "Hello HomeGirl".to_string(),
+                    Some(Condition(vec![WorldEvent::HasCharisma])),
+                    3,
+                ),
+                Choice::new("KeroKero".to_string(), None, 1),
+            ]),
+            vec![],
+        ),
+    );
 
-//     let deserialized_map: BTreeMap<usize, DialogNodeYML> = serde_yaml::from_str(&yaml).unwrap();
+    let deserialized_map: BTreeMap<usize, DialogNodeYML> = serde_yaml::from_str(&yaml).unwrap();
 
-//     assert_eq!(map, deserialized_map)
-// }
+    assert_eq!(map, deserialized_map)
+}
+
+#[test]
+fn test_custom_serialize() {
+    let mut map = BTreeMap::new();
+    map.insert(
+        1,
+        DialogNodeYML::new(
+            "The Frog".to_string(),
+            Content::Choices(vec![
+                Choice::new(String::from("Hello HomeGirl"), None, 2),
+                Choice::new(String::from("KeroKero"), None, 3),
+            ]),
+            vec![],
+        ),
+    );
+    map.insert(
+        2,
+        DialogNodeYML::new(
+            "Random Frog".to_string(),
+            Content::Monolog {
+                text: vec![String::from("Yo Homie")],
+                exit_state: 4,
+            },
+            vec![],
+        ),
+    );
+    map.insert(
+        3,
+        DialogNodeYML::new(
+            "Random Frog".to_string(),
+            Content::Monolog {
+                text: vec![String::from("KeroKero")],
+                exit_state: 4,
+            },
+            vec![],
+        ),
+    );
+
+    let yaml = serde_yaml::to_string(&map).unwrap();
+
+    assert_eq!(
+        yaml,
+        "1:
+  source: The Frog
+  choices:
+    - text: Hello HomeGirl
+      condition: null
+      exit_state: 2
+    - text: KeroKero
+      condition: null
+      exit_state: 3
+  trigger_event: []
+2:
+  source: Random Frog
+  monolog:
+    text:
+      - Yo Homie
+    exit_state: 4
+  trigger_event: []
+3:
+  source: Random Frog
+  monolog:
+    text:
+      - KeroKero
+    exit_state: 4
+  trigger_event: []\n"
+            .to_string()
+    )
+}
+*/

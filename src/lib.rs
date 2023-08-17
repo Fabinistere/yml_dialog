@@ -120,26 +120,26 @@ impl DialogNodeYML {
 ///     yaml,
 ///     "1:
 ///   source: The Frog
-///   choices:
-///     - text: Hello HomeGirl
-///       condition: null
-///       exit_state: 2
-///     - text: KeroKero
-///       condition: null
-///       exit_state: 3
+///   content:
+///   - text: Hello HomeGirl
+///     condition: null
+///     exit_state: 2
+///   - text: KeroKero
+///     condition: null
+///     exit_state: 3
 ///   trigger_event: []
 /// 2:
 ///   source: Random Frog
-///   monolog:
+///   content:
 ///     text:
-///       - Yo Homie
+///     - Yo Homie
 ///     exit_state: 4
 ///   trigger_event: []
 /// 3:
 ///   source: Random Frog
-///   monolog:
+///   content:
 ///     text:
-///       - KeroKero
+///     - KeroKero
 ///     exit_state: 4
 ///   trigger_event: []\n"
 ///         .to_string()
