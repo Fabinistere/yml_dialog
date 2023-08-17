@@ -4,11 +4,14 @@
 //! - Choose your answer with the down right buttons.
 //! - You can press the reset button to ... to reset.
 //! - Click on one of the three frog portrait above.
+//!
+//! Also, on't worry about the timer. It's the lore.
 
 use bevy::{
     input::{keyboard::KeyboardInput, ButtonState},
     prelude::*,
     render::texture::ImagePlugin,
+    time::Stopwatch,
     window::WindowResolution,
     winit::WinitSettings,
 };
@@ -27,6 +30,14 @@ const RESOLUTION: f32 = 16.0 / 9.0;
 const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
 const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
+
+/// Say, for whatever reason, we want to speedrun this example (bigup to Juju <3)
+#[derive(Resource, Debug, Reflect, Deref, DerefMut, Clone, Default)]
+struct SpeedrunTimer(Stopwatch);
+
+/// Points to the Speedrun Timer Visualizer
+#[derive(Component)]
+struct SpeedrunTimerText;
 
 /// Points to the current entity, if they exist, who we're talking with.
 /// Query this entity to get the current Dialog.
@@ -47,6 +58,7 @@ enum WorldEvent {
     FrogLove,
     FrogHate,
     FrogTalk,
+    SpeedrunEnd,
 }
 
 impl fmt::Display for WorldEvent {
@@ -55,6 +67,7 @@ impl fmt::Display for WorldEvent {
             WorldEvent::FrogLove => write!(f, "FrogLove"),
             WorldEvent::FrogHate => write!(f, "FrogHate"),
             WorldEvent::FrogTalk => write!(f, "FrogTalk"),
+            WorldEvent::SpeedrunEnd => write!(f, "SpeedrunEnd"),
         }
     }
 }
@@ -67,6 +80,7 @@ impl FromStr for WorldEvent {
             "FrogTalk" => Ok(WorldEvent::FrogTalk),
             "FrogLove" => Ok(WorldEvent::FrogLove),
             "FrogHate" => Ok(WorldEvent::FrogHate),
+            "SpeedrunEnd" => Ok(WorldEvent::SpeedrunEnd),
             _ => Err(()),
         }
     }
@@ -147,6 +161,7 @@ fn main() {
         .insert_resource(ActiveWorldEvents::default())
         .insert_resource(DialogMap::default())
         .insert_resource(Monolog::default())
+        .insert_resource(SpeedrunTimer::default())
         .add_event::<ChangeStateEvent>()
         .add_event::<TriggerEvents>()
         .add_startup_systems((setup, spawn_camera))
@@ -162,6 +177,7 @@ fn main() {
             change_interlocutor_portrait,
             button_system,
             // button_visibility,
+            update_speedrun_timer.run_if(speedrun_still_on),
         ));
 
     app.run();
@@ -170,6 +186,7 @@ fn main() {
 fn reset_system(
     mut active_world_events: ResMut<ActiveWorldEvents>,
     mut dialogs: ResMut<DialogMap>,
+    mut speedrun_timer: ResMut<SpeedrunTimer>,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<Reset>, With<Button>)>,
 ) {
     if let Ok(interaction) = interaction_query.get_single() {
@@ -180,6 +197,7 @@ fn reset_system(
                 }
             }
             active_world_events.clear();
+            speedrun_timer.reset();
         }
     }
 }
@@ -492,9 +510,10 @@ fn update_dialog_panel(
                                     } else {
                                         // NPC Choices
                                         let mut possible_choices_index: Vec<usize> = Vec::new();
-                                        for (index, choice) in choices.iter().enumerate() {
+                                        for choice in choices.iter() {
                                             match choice.condition() {
-                                                None => possible_choices_index.push(index),
+                                                None => possible_choices_index
+                                                    .push(*choice.exit_state()),
                                                 Some(condition) => {
                                                     if condition.is_verified(
                                                         None,
@@ -503,7 +522,8 @@ fn update_dialog_panel(
                                                             .map(|x| x.to_string())
                                                             .collect::<Vec<String>>(),
                                                     ) {
-                                                        possible_choices_index.push(index);
+                                                        possible_choices_index
+                                                            .push(*choice.exit_state());
                                                     }
                                                 }
                                             }
@@ -589,7 +609,9 @@ const OLD_FROG_DIALOG: &str = "1:
     text:
       - You have my respect.
       - Press Reset or alt+f4.
-    exit_state: 4\n";
+    exit_state: 4
+  trigger_event:
+      - SpeedrunEnd\n";
 
 const FROG_DIALOG: &str = "1:
   source: Frog
@@ -600,7 +622,7 @@ const FROG_DIALOG: &str = "1:
     - text: Crôaa
       condition: null
       exit_state: 3
-    - text: bêêh
+    - text: Bêêh
       condition: null
       exit_state: 4
 2:
@@ -619,7 +641,7 @@ const FROG_DIALOG: &str = "1:
   source: Frog
   content:
     text:
-      - bêêh
+      - Bêêh
     exit_state: 5
 5:
   source: Player
@@ -691,6 +713,20 @@ const WARRIOR_DIALOG: &str = "1:
     exit_state: 5
   trigger_event:
     - FrogTalk\n";
+
+fn update_speedrun_timer(
+    time: Res<Time>,
+    mut speedrun_timer: ResMut<SpeedrunTimer>,
+    mut timer_visualizer: Query<&mut Text, With<SpeedrunTimerText>>,
+) {
+    let mut text = timer_visualizer.single_mut();
+    text.sections[0].value = speedrun_timer.elapsed_secs().to_string();
+    speedrun_timer.tick(time.delta());
+}
+
+fn speedrun_still_on(active_world_events: Res<ActiveWorldEvents>) -> bool {
+    !active_world_events.contains(&WorldEvent::SpeedrunEnd)
+}
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>, mut dialogs: ResMut<DialogMap>) {
     /* -------------------------------------------------------------------------- */
@@ -843,6 +879,37 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>, mut dialogs: Re
                                     font_size: 30.,
                                     color: Color::rgb(0.9, 0.9, 0.9),
                                 },
+                            ));
+                        });
+
+                    parent
+                        .spawn((
+                            NodeBundle {
+                                style: Style {
+                                    size: Size::new(Val::Px(150.), Val::Px(65.)),
+                                    // horizontally center child text
+                                    justify_content: JustifyContent::Center,
+                                    // vertically center child text
+                                    align_items: AlignItems::Center,
+                                    align_self: AlignSelf::Center,
+                                    ..default()
+                                },
+                                ..default()
+                            },
+                            Name::new(format!("Speedrun Timer Node")),
+                        ))
+                        .with_children(|parent| {
+                            parent.spawn((
+                                TextBundle::from_section(
+                                    "",
+                                    TextStyle {
+                                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                                        font_size: 30.,
+                                        color: Color::rgb(0.9, 0.9, 0.9),
+                                    },
+                                ),
+                                SpeedrunTimerText,
+                                Name::new(format!("Speedrun Timer Visualizer")),
                             ));
                         });
 
