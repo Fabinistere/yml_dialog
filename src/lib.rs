@@ -21,22 +21,22 @@ use serde::{
 };
 
 /// This correspond to a unique key
-#[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 #[serde(default)]
-pub struct DialogNodeYML {
+pub struct DialogNode {
     source: String,
     content: Content,
     /// REFACTOR: Turn this into a generic type `extra`
     trigger_event: Vec<String>,
 }
 
-impl DialogNodeYML {
+impl DialogNode {
     /// Constructs a new DialogNode with the given
     /// - `source`,
     /// - `content`,
     /// - `trigger_event` vector
     pub fn new(source: String, content: Content, trigger_event: Vec<String>) -> Self {
-        DialogNodeYML {
+        DialogNode {
             source,
             content,
             trigger_event,
@@ -83,7 +83,7 @@ impl DialogNodeYML {
 /// let mut map = BTreeMap::new();
 /// map.insert(
 ///     1,
-///     DialogNodeYML::new(
+///     DialogNode::new(
 ///         "The Frog".to_string(),
 ///         Content::Choices(vec![
 ///             Choice::new(String::from("Hello HomeGirl"), None, 2),
@@ -94,7 +94,7 @@ impl DialogNodeYML {
 /// );    
 /// map.insert(
 ///     2,
-///     DialogNodeYML::new(
+///     DialogNode::new(
 ///         "Random Frog".to_string(),
 ///         Content::Monolog {
 ///             text: vec![String::from("Yo Homie")],
@@ -105,7 +105,7 @@ impl DialogNodeYML {
 /// );
 /// map.insert(
 ///     3,
-///     DialogNodeYML::new(
+///     DialogNode::new(
 ///         "Random Frog".to_string(),
 ///         Content::Monolog {
 ///             text: vec![String::from("KeroKero")],
@@ -120,26 +120,26 @@ impl DialogNodeYML {
 ///     yaml,
 ///     "1:
 ///   source: The Frog
-///   choices:
-///     - text: Hello HomeGirl
-///       condition: null
-///       exit_state: 2
-///     - text: KeroKero
-///       condition: null
-///       exit_state: 3
+///   content:
+///   - text: Hello HomeGirl
+///     condition: null
+///     exit_state: 2
+///   - text: KeroKero
+///     condition: null
+///     exit_state: 3
 ///   trigger_event: []
 /// 2:
 ///   source: Random Frog
-///   monolog:
+///   content:
 ///     text:
-///       - Yo Homie
+///     - Yo Homie
 ///     exit_state: 4
 ///   trigger_event: []
 /// 3:
 ///   source: Random Frog
-///   monolog:
+///   content:
 ///     text:
-///       - KeroKero
+///     - KeroKero
 ///     exit_state: 4
 ///   trigger_event: []\n"
 ///         .to_string()
@@ -149,7 +149,7 @@ impl DialogNodeYML {
 /// # Note
 ///
 /// TODO: Custom impl Serialization
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[serde(untagged)]
 pub enum Content {
     /// A vector of Choice
@@ -198,7 +198,7 @@ impl Default for Content {
 /// - a `text` line,
 /// - a `condition` and
 /// - an `exit_state` corresponding to the continue of this choice.
-#[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 #[serde(default)]
 pub struct Choice {
     text: String,
@@ -272,7 +272,7 @@ impl Choice {
 // }
 
 /// REFACTOR: Turn this into a Generic Type
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord, Default, Debug, Clone)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub struct Condition {
     events: Vec<String>,
     karma_threshold: Option<(i32, i32)>,
