@@ -1,9 +1,8 @@
 # YML based Dialog Structure
 
 <!-- [![Bevy tracking](https://img.shields.io/badge/Bevy%20tracking-released%20version-lightblue)](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md#main-branch-tracking) -->
-[![v0.2.1](https://img.shields.io/badge/v0.2.1-gray?style=flat&logo=github&logoColor=181717&link=https://github.com/Fabinistere/bevy_turn-based_combat/releases/tag/v0.2.1)](https://github.com/Fabinistere/bevy_turn-based_combat/releases/tag/v0.2.1)
 <!-- [![Bevy tracking](https://img.shields.io/badge/Bevy%20tracking-0.10-lightblue)](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md#main-branch-tracking) -->
-[![MIT/Apache 2.0](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](https://github.com/fabinistere/bevy_turn-based_combat#license)
+[![v0.2.2](https://img.shields.io/badge/v0.2.2-gray?style=flat&logo=github&logoColor=181717&link=https://github.com/Fabinistere/bevy_turn-based_combat/releases/tag/v0.2.2)](https://github.com/Fabinistere/bevy_turn-based_combat/releases/tag/v0.2.2) [![MIT/Apache 2.0](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](https://github.com/fabinistere/bevy_turn-based_combat#license)
 
 <!--
 | bevy | yml_dialog |
@@ -12,9 +11,9 @@
 | 0.10 | 0.2.0      |
 -->
 
-## Example
+## [Example](https://fabinistere.github.io/yml_dialog/)
 
-[![complete_example](https://github.com/Fabinistere/yml_dialog/assets/73140258/731025d7-9eed-4b92-a820-a175bf886df7)](https://fabinistere.github.io/yml_dialog/)
+[![complete_example](https://github.com/Fabinistere/yml_dialog/assets/73140258/9f6a57d4-c0d8-43a0-aa56-a0873c7c0728)](https://fabinistere.github.io/yml_dialog/)
 
 If you want to compile the code at home, [download assets here](https://cloud.disroot.org/s/sSsjHxXpTH88oyW): disroot's cloud,
 clone the repo, extract the assets in the root of the repo and run `cargo run --example complete_example`.
