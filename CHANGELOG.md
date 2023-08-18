@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The example `complete_example` now features a cool speedrun timer for my fellow homie Julien <3.
+- Press `r` in `complete_example`, to reset.
 
 ## API Guideline - [v0.2.1](https://github.com/Fabinistere/yml_dialog/releases/tag/v0.2.1) - 2023-08-18
 

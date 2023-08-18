@@ -6,6 +6,7 @@
 //! - Click on one of the three frog portrait above.
 //!
 //! Also, on't worry about the timer. It's the lore.
+//! Press r to reset it but it won't be on the `ShortcutLess`.
 
 use bevy::{
     input::{keyboard::KeyboardInput, ButtonState},
@@ -187,18 +188,43 @@ fn reset_system(
     mut active_world_events: ResMut<ActiveWorldEvents>,
     mut dialogs: ResMut<DialogMap>,
     mut speedrun_timer: ResMut<SpeedrunTimer>,
-    interaction_query: Query<&Interaction, (Changed<Interaction>, With<Reset>, With<Button>)>,
+    keys: Res<Input<KeyCode>>,
+    interaction_query: Query<
+        (&Interaction, &Children),
+        (Changed<Interaction>, With<Reset>, With<Button>),
+    >,
+    mut text_query: Query<&mut Text>,
 ) {
-    if let Ok(interaction) = interaction_query.get_single() {
-        if *interaction == Interaction::Clicked {
-            for (_key, (current_state, dialog)) in dialogs.iter_mut() {
-                if let Some(lower_state) = dialog.first_entry() {
-                    *current_state = *lower_state.key()
+    if let Ok((interaction, children)) = interaction_query.get_single() {
+        match interaction {
+            Interaction::Clicked => {
+                for (_key, (current_state, dialog)) in dialogs.iter_mut() {
+                    if let Some(lower_state) = dialog.first_entry() {
+                        *current_state = *lower_state.key()
+                    }
                 }
+                active_world_events.clear();
+                speedrun_timer.reset();
             }
-            active_world_events.clear();
-            speedrun_timer.reset();
+            Interaction::Hovered => {
+                let mut text = text_query.get_mut(children[0]).unwrap();
+                text.sections[0].value = "Press r".to_string();
+            }
+            Interaction::None => {
+                let mut text = text_query.get_mut(children[0]).unwrap();
+                text.sections[0].value = "Reset".to_string();
+            }
         }
+    }
+
+    if keys.just_pressed(KeyCode::R) {
+        for (_key, (current_state, dialog)) in dialogs.iter_mut() {
+            if let Some(lower_state) = dialog.first_entry() {
+                *current_state = *lower_state.key()
+            }
+        }
+        active_world_events.clear();
+        speedrun_timer.reset();
     }
 }
 
@@ -278,6 +304,9 @@ fn continue_monolog(
     mut change_state_event: EventWriter<ChangeStateEvent>,
 ) {
     for ev in key_evr.iter() {
+        if ev.key_code == Some(KeyCode::R) {
+            return;
+        }
         if ev.state == ButtonState::Pressed {
             if current_monolog.texts.len() > 1 {
                 if let Some((_first, rem)) = current_monolog.texts.split_first() {
