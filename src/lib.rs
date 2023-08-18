@@ -13,7 +13,6 @@
 //!   - A node can send Specific Event
 #![warn(missing_docs)]
 
-use log::warn;
 use serde::{
     // ser::{SerializeStruct, SerializeStructVariant, Serializer},
     Deserialize,
