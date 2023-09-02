@@ -1,12 +1,11 @@
 # YML based Dialog Structure
 
-<!-- [![Bevy tracking](https://img.shields.io/badge/Bevy%20tracking-released%20version-lightblue)](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md#main-branch-tracking) -->
-<!-- [![Bevy tracking](https://img.shields.io/badge/Bevy%20tracking-0.10-lightblue)](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md#main-branch-tracking) -->
+[![Crates.io](https://img.shields.io/crates/v/yml_dialog.svg)](https://crates.io/crates/yml_dialog)
 [![v0.2.2](https://img.shields.io/badge/v0.2.2-gray?style=flat&logo=github&logoColor=181717&link=https://github.com/Fabinistere/bevy_turn-based_combat/releases/tag/v0.2.2)](https://github.com/Fabinistere/bevy_turn-based_combat/releases/tag/v0.2.2) [![MIT/Apache 2.0](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](https://github.com/fabinistere/bevy_turn-based_combat#license)
 
 <!--
 | bevy | yml_dialog |
-|------|------------|
+| ---- | ---------- |
 | 0.10 | 0.2.1      |
 | 0.10 | 0.2.0      |
 -->
