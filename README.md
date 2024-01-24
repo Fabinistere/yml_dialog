@@ -14,8 +14,15 @@
 
 [![complete_example](https://github.com/Fabinistere/yml_dialog/assets/73140258/9f6a57d4-c0d8-43a0-aa56-a0873c7c0728)](https://fabinistere.github.io/yml_dialog/)
 
+Test the complete example in [web](https://fabinistere.github.io/yml_dialog/).
+
 If you want to compile the code at home, [download assets here](https://cloud.disroot.org/s/sSsjHxXpTH88oyW): disroot's cloud,
 clone the repo, extract the assets in the root of the repo and run `cargo run --example complete_example`.
+It uses bevy.
+
+<!-- TODO: example - reduce the bevy config of the complete example -->
+<!-- TODO: example - rename complete_example by bevy_example -->
+<!-- TODO: example - create examples without bevy -->
 
 ## RoadMap
 
