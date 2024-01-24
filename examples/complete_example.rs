@@ -420,7 +420,7 @@ fn update_dialog_panel(
         // info!("UpdateDialogPanel");
         match current_interlocutor.interlocutor {
             // assert_eq!(!current_interlocutor.is_none(), current_interlocutor.interlocutor == None)
-            None => warn!("Logic Crack: current_interlocutor is None while being not None"),
+            None => error!("Logic Crack: current_interlocutor is None while being not None"),
             Some(interlocutor) => {
                 if let Some(&(current_state, ref dialog)) = dialogs.get(&interlocutor) {
                     // info!("current_state: {}", current_state);
